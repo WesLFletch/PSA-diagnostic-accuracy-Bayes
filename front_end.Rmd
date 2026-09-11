@@ -1,0 +1,28 @@
+---
+title: "STAT-638 Group Project 10: Diagnostic Accuracy of PSA Progression in Prostate Cancer"
+author: "Wesley Fletcher and Peyton Miles"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Scientific Question and Data
+
+# 2. Bayesian Model
+
+# 3. Prior Distributions
+
+# 4. Posterior Computation and Diagnostics
+
+# 5. Posterior Results and Interpretation
+
+# 6. Sensitivity Analysis and Model Checking
+
+# 7. Alternative Analysis, Comparison, and Bayesian Justification
+
+# 8. Innovation or Extension
+
+# References
