@@ -11,7 +11,53 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # 1. Scientific Question and Data
 
+Screening for prostate cancer (PCa) is commonly done by taking measures of patients' Prostate-Specific Antigen (PSA) levels, a relatively low-cost and non-invasive procedure. Although it is widely used for initial diagnoses, it may further be a useful indicator of the disease's progression.
+
+We seek to evaluate the diagnostic accuracy of PSA in determining PCa progression through sensitivity and specificity analyses conducted on a longitudinal clinical trial sponsored by AstraZeneca (trial NCT00626548). The trial examined the efficacy of ZD4054 (Zibotentan) in treating non-metastatic hormone resistant PCa. The protected-access de-identified data contains information on subject follow-ups, including XXXXXXXX and XXXXXXX which serve as proxies for PSA and PCa progression, respectively. Note that the PCa progression indicator was not derived using information about PSA, so that their relationship is not inherently tautological but still has some dependence structure.
+
+If an event occurs, then it is only known to have occurred between the times of the previous and subsequent visits. Further, if it does not occur before the subject's last follow-up date, then it is known only to have occurred after said date. So our knowledge of each subject's event times is restricted to the (in)finite time intervals in which the true event times exist, i.e. our data is interval-censored.
+
 # 2. Bayesian Model
+
+Define $Y$ and $Z$ to be the respective times of PSA and PCa progression, and $X$ as the vector of treatment and demographic variables. For simplification, assume $Y\perp Z|X$ so that the joint distribution of $(X,Y,X)$ is fully characterized by the distributions of $(X,Y)$ and $(X,Z)$, i.e. we can separately model the conditional distributions $Y|X$ and $Z|X$ without any loss of the dependence structure between $Y$ and $Z$. Lastly, we assume that all subjects are independent.
+
+We posit that
+
+$$
+\begin{aligned}
+\log Y|X,\beta_Y,\sigma^2_Y&\sim\mathrm{N}(X^\prime\beta_Y,\sigma^2_Y) \\
+\log Z|X,\beta_Z,\sigma^2_Z&\sim\mathrm{N}(X^\prime\beta_Z,\sigma^2_Z).
+\end{aligned}
+$$
+
+For $i=1,\cdots,n$ independent subjects, we observe data $(x,y^L,y^R,z^L,z^R)_i$ where $y^L$ and $y^R$ and the left and right endpoints of the event time intervals for $Y$, and $z^L$ and $z^R$ are the analogous interval endpoints of $Z$. The resulting data likelihood for $Y$ is
+
+$$
+\begin{aligned}
+L(\beta_Y,\sigma^2_Y)&=\prod_{i=1}^n\mathbb{P}\left(y^L_i<Y<y^R_i|X=x_i\right) \\
+&=\prod_{i=1}^n\int_{\log y^L_i}^{\log y^R_i}\dfrac{1}{\sigma_Y}\phi\left(\dfrac{t-x_i^\prime\beta_Y}{\sigma_Y}\right)\,dt \\
+&=\prod_{i=1}^n\left\lbrack\Phi\left(\dfrac{\log y^R_i-x_i^\prime\beta_Y}{\sigma_Y}\right)-\Phi\left(\dfrac{\log y^L_i-x_i^\prime\beta_Y}{\sigma_Y}\right)\right\rbrack
+\end{aligned}
+$$
+
+and the symmetric likelihood for $Z$ is
+
+$$
+L(\beta_Z,\sigma^2_Z)=\prod_{i=1}^n\left\lbrack\Phi\left(\dfrac{\log z^R_i-x_i^\prime\beta_Z}{\sigma_Z}\right)-\Phi\left(\dfrac{\log z^L_i-x_i^\prime\beta_Z}{\sigma_Z}\right)\right\rbrack
+$$
+
+where $\phi(\cdot)$ and $\Phi(\cdot)$ are the standard normal distribution's pdf and cdf, respectively. The log-normal likelihood is used as it is strictly non-negative and has an increasing variance as the location parameter increases, which are common assumptions in survival analysis.
+
+Given posterior draws for $\beta_Y,\sigma^2_Y,\beta_Z,\sigma^2_Z$, the posterior predictive distributions $Y^*|X^*,Y,X$ and $Z^*|X^*,Z,X$ can be estimated for an individual with treatment/demographics $X^*$. The confusion matrix
+
+|                    |                                                             |                                                             |
+|-------------------:|------------------------------------------------------------:|------------------------------------------------------------:|
+|                    |                                          No PSA Progression |                                             PSA Progression |
+| No PCa Progression | $=\mathbb{P}(Y^*<t|X^*,Y,X)\times\mathbb{P}(Z^*<t|X^*,Z,X)$ | $=\mathbb{P}(Y^*>t|X^*,Y,X)\times\mathbb{P}(Z^*<t|X^*,Z,X)$ |
+|    PCa Progression | $=\mathbb{P}(Y^*<t|X^*,Y,X)\times\mathbb{P}(Z^*>t|X^*,Z,X)$ | $=\mathbb{P}(Y^*>t|X^*,Y,X)\times\mathbb{P}(Z^*>t|X^*,Z,X)$ |
+|                    |                                                             |                                                             |
+
+can be used to assess the diagnostic accuracy of PSA in predicting PCa progression at various clinical horizons $t$ and subject treatments/demographics $X$. We focus on the one-year $(t=365)$ horizon and assess subjects of various treatment/demographics combinations. The simplification of the table entries into a product of conditional probabilities follows from the conditional independence assumption.
 
 # 3. Prior Distributions
 
