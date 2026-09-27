@@ -71,6 +71,10 @@ can be used to assess the diagnostic accuracy of PSA in predicting PCa progressi
 
 # 3. Prior Distributions
 
+Recall our hierarchical joint specification $\beta_Y,\beta_Z\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta)$ for the relationship between subject covariates and the latent co-pathway outcomes $Y,Z$. To encourage closeness between $\beta_Y$ and $\beta_Z$ in parameter space, we use the informative conjugate prior $(\Sigma_\beta)_{j,j}^{-1}\overset{iid}{\sim}\mathrm{Gamma}(2,1)$ for $j=1,2$ on the precision of each coefficient's difference from the corresponding entry in the latent vector $\beta$. The off-diagonal entries are set to 0 as a simplifying assumption. The non-informative conjugate $\beta_j\overset{iid}{\sim}\mathrm{N}(0, 1000)$, $j=1,\cdots,p$ prior is used for the latent co-pathway demographics-related progression drivers.
+
+To jointly model the latent time-to-event outcome covariance matrix $\Sigma_{YZ}$, we use the non-informative $(\Sigma_{YZ})^{-1}\sim\mathrm{Wishart}(2, I_2/2)$ conjugate prior on the precision matrix, where $I_a$ is the $a\times a$ identity. It is the least informative proper Wishart prior, and has expectation $I_2$. These specific choices of prior hyperparameters were chosen by a short simulation study conducted prior to the analysis of real data.
+
 # 4. Posterior Computation and Diagnostics
 
 # 5. Posterior Results and Interpretation
