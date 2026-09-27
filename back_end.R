@@ -1,3 +1,4 @@
+library("rjags")
 library("tidyverse")
 library("PipeHelpR") # devtools::install_github("WesLFletch/PipeHelpR")
 
@@ -62,3 +63,86 @@ progression = vsit %>% distinct(SUBJ, VISIT, VISDYTRT) %>% # start with patient/
     demo %>% distinct(SUBJ, ETHGRP, AGEGRP),
     by=c("SUBJ" = "SUBJ")
   )
+
+# data-to-posterior pipeline
+fit_model = function(boundsyz,
+                     x,
+                     diagbeta = 1.0e-3*diag(ncol(x)),
+                     diagOmegayz = diag(2)/2,
+                     dfOmegayz = 2,
+                     M = 1e+4,
+                     burnin = 1e+4,
+                     thin = 1) {
+  model_string = "
+  model {
+    # data likelihood
+    for (i in 1:n) {
+      # observations are interval-censored
+      for (j in 1:2) { Iyz[i,j] ~ dinterval(yz[i,j], boundsyz[i,j,1:2]) }
+      for (j in 1:2) { yz[i,j] = exp(logyz[i,j]) }                    # lognormal responses
+      logyz[i,1:2] ~ dmnorm(muyz[i,1:2], Omegayz[1:2,1:2])            # log is norm round lp
+      for (j in 1:2) { muyz[i,j] = inprod(x[i,1:p], betayz[1:p,j]) }  # linear predictor
+    }
+    # hierarchical beta coefficients
+    for (j in 1:p) { for (k in 1:2) { betayz[j,k] ~ dnorm(beta[j], tausqbeta[j]) } }
+    # priors
+    beta ~ dmnorm(mubeta[1:p], diagbeta[1:p,1:p])
+    for (j in 1:p) { mubeta[j] = 0 }
+    for (j in 1:p) { tausqbeta[j] ~ dgamma(2, 1) }    # equiv to gamma prior on precision
+    Omegayz ~ dwish(diagOmegayz[1:2,1:2], dfOmegayz)  # Wishart prior on event covariance
+    # additional posteriors to be returned
+    Sigmayz = inverse(Omegayz)                        # latent outcome covariance matrix
+  }
+  "
+  n = nrow(x)
+  p = ncol(x)
+  datalist = list(
+    x = x,
+    boundsyz = boundsyz,
+    Iyz = matrix(1, nrow=n, ncol=2),
+    n = n,
+    p = p,
+    diagbeta = diagbeta,
+    diagOmegayz = diagOmegayz,
+    dfOmegayz = dfOmegayz
+  )
+  initslist = list(
+    betayz = matrix(rep(0, 2*p), ncol=2),
+    Omegayz = diag(2),
+    logyz = log(apply(boundsyz, 1:2, mean))
+  )
+  out_model = jags.model(textConnection(model_string), data=datalist, inits=initslist)
+  update(out_model, n.iter=burnin)
+  posterior = coda.samples(
+    out_model,
+    variable.names=c("betayz", "Sigmayz"),
+    n.iter=M,
+    thin=thin
+  )
+  list(
+    betayz = posterior[[1]] %>%
+      as_tibble() %>%
+      select(starts_with("betayz")) %>%
+      mutate(draw = row_number(), .before=everything()) %>%
+      pivot_longer(-draw, names_to="var", values_to="value") %>%
+      mutate(
+        j = substr(var, start=8, stop=8),
+        k = substr(var, start=10, stop=10),
+        .before=everything(),
+        .keep="unused"
+      ) %>%
+      xtabs(value~j+k+draw, data=.),
+    Sigmayz = posterior[[1]] %>%
+      as_tibble() %>%
+      select(starts_with("Sigmayz")) %>%
+      mutate(draw = row_number(), .before=everything()) %>%
+      pivot_longer(-draw, names_to="var", values_to="value") %>%
+      mutate(
+        j = substr(var, start=9, stop=9),
+        k = substr(var, start=11, stop=11),
+        .before=everything(),
+        .keep="unused"
+      ) %>%
+      xtabs(value~j+k+draw, data=.)
+  )
+}
