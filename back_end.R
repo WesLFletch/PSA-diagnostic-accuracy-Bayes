@@ -124,10 +124,10 @@ fit_model = function(boundsyz,
       as_tibble() %>%
       select(starts_with("betayz")) %>%
       mutate(draw = row_number(), .before=everything()) %>%
-      pivot_longer(-draw, names_to="var", values_to="value") %>%
+      pivot_longer(-draw, names_to="var_name", values_to="value") %>%
       mutate(
-        j = substr(var, start=8, stop=8),
-        k = substr(var, start=10, stop=10),
+        j = as.numeric(str_extract_all(var_name, "\\d+") %>% sapply(\(v)v[1])),
+        k = as.numeric(str_extract_all(var_name, "\\d+") %>% sapply(\(v)v[2])),
         .before=everything(),
         .keep="unused"
       ) %>%
@@ -136,10 +136,10 @@ fit_model = function(boundsyz,
       as_tibble() %>%
       select(starts_with("Sigmayz")) %>%
       mutate(draw = row_number(), .before=everything()) %>%
-      pivot_longer(-draw, names_to="var", values_to="value") %>%
+      pivot_longer(-draw, names_to="var_name", values_to="value") %>%
       mutate(
-        j = substr(var, start=9, stop=9),
-        k = substr(var, start=11, stop=11),
+        j = as.numeric(str_extract_all(var_name, "\\d+") %>% sapply(\(v)v[1])),
+        k = as.numeric(str_extract_all(var_name, "\\d+") %>% sapply(\(v)v[2])),
         .before=everything(),
         .keep="unused"
       ) %>%
