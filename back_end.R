@@ -146,3 +146,24 @@ fit_model = function(boundsyz,
       xtabs(value~j+k+draw, data=.)
   )
 }
+
+# compute confusion matrix from posterior and given covariates
+confusion_matrix = function(x,            # length p vector, one row from design matrix
+                            betayz_draws, # p by 2 by M array
+                            Sigmayz_draws # 2 by 2 by M array
+                            ) {
+  p = length(x)
+  M = dim(betayz_draws)[3]
+  arrapply(1:M, f=\(m){ # simulate latent Y,Z pair for all posterior draws
+    betayz = betayz_draws[,,m]
+    Sigmayz = Sigmayz_draws[,,m]
+    L = t(chol(Sigmayz))
+    muyz = as.vector(x%*%betayz)
+    as.vector(exp(muyz+L%*%rnorm(2)))
+  }) %>%
+    apply(1, \(v)2*(v[1]<365)+(v[2]<365)) %>% # assign joint outcomes to confusion table
+    table() %>% # tabulate results
+    matrix(nrow=2, byrow=T) %>% # reformat into 2x2 matrix
+    do(\(tab)tab/sum(tab)) %>% # convert to empirical cell probabilities
+    setDimnames(list("Y" = c("0", "1"), "Z" = c("0", "1"))) # rename table entries
+}
