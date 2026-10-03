@@ -148,9 +148,10 @@ fit_model = function(boundsyz,
 }
 
 # compute confusion matrix from posterior and given covariates
-confusion_matrix = function(x,            # length p vector, one row from design matrix
-                            betayz_draws, # p by 2 by M array
-                            Sigmayz_draws # 2 by 2 by M array
+confusion_matrix = function(x,              # length p vector, one row from design matrix
+                            betayz_draws,   # p by 2 by M array
+                            Sigmayz_draws,  # 2 by 2 by M array
+                            t_horizon=365 # numeric scalar
                             ) {
   p = length(x)
   M = dim(betayz_draws)[3]
@@ -161,8 +162,14 @@ confusion_matrix = function(x,            # length p vector, one row from design
     muyz = as.vector(x%*%betayz)
     as.vector(exp(muyz+L%*%rnorm(2)))
   }) %>%
-    apply(1, \(v)2*(v[1]<365)+(v[2]<365)) %>% # assign joint outcomes to confusion table
+    `<`(t_horizon) %>% # compare simulated event times with time threshold
+    do(\(mat)2*mat[,1]+mat[,2]) %>% # assign joint outcomes to confusion matrix entries
     table() %>% # tabulate results
+    do(\(v){ # ensure tabulation is properly populated
+      out = rep(0, 4) %>% setNames(0:3)
+      out[names(v)] = v
+      out
+    }) %>%
     matrix(nrow=2, byrow=T) %>% # reformat into 2x2 matrix
     do(\(tab)tab/sum(tab)) %>% # convert to empirical cell probabilities
     setDimnames(list("Y" = c("0", "1"), "Z" = c("0", "1"))) # rename table entries
