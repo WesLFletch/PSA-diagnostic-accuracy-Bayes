@@ -19,10 +19,10 @@ If a progression event occurs, then it is only known to have occurred between th
 
 # 2. Bayesian Model
 
-Define $Y$ and $Z$ to be the respective times of PSA and XXXXXXX progression, and $X$ as the vector of treatment and demographic variables. We posit that
+Define $Y$ and $Z$ to be the respective times of PSA and XXXXXXX progression, and $X$ as the $p$-vector of treatment and demographic variables. We posit that
 
 $$
-\log Y,\log Z|X,\beta_Y,\beta_Z,\Sigma_{YZ}\sim\mathrm{N}\left(\mu_{YZ},\Sigma_{YZ}\right)
+\log\begin{bmatrix}Y\\Z\end{bmatrix}|X,\beta_Y,\beta_Z,\Sigma_{YZ}\sim\mathrm{N}\left(\mu_{YZ},\Sigma_{YZ}\right)
 $$
 
 where
@@ -40,23 +40,23 @@ $$
 and
 
 $$
-\beta_Y,\beta_Z|\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta).
+\beta_Y,\beta_Z|\beta,\Sigma_\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta).
 $$
 
 We assume that all subjects are independent, but impose no such assumption on each individual's joint distribution of responses $Y,Z$ so that the latent health/disease progression can jointly drive the PSA and XXXXXXXX event times, quantified by the covariance parameter $\sigma^2_{YZ}$. The joint hierarchical specification of $\beta_Y,\beta_Z$ is motivated by the knowledge that both PSA and XXXXXXXX progression should be roughly symmetrically affected by the treatment and demographic covariates, encouraging an informative, near-zero concentrated prior on the entries of $\Sigma_\beta$.
 
-For $i=1,\cdots,n$ independent subjects, we observe data $(x,y^L,y^R,z^L,z^R)_i$ where $y^L$ and $y^R$ and the left and right endpoints of the event time intervals for $Y$, and $z^L$ and $z^R$ are the analogous interval endpoints of $Z$. The resulting data likelihood is
+For $i=1,\cdots,n$ independent subjects, we observe data $(x,y^L,y^R,z^L,z^R)_i$ where $y^L$ and $y^R$ and the left and right endpoints of the event time intervals for $Y$, and $z^L$ and $z^R$ are the analogous interval endpoints of $Z$. The resulting data likelihood for the latent outcome pair is
 
 $$
 \begin{aligned}
-L(\beta_Y,\beta_Z,\Sigma_{YZ})&=\prod_{i=1}^n\mathbb{P}\left(y^L_i<Y<y^R_i,z^L_i<Z<z^R_i|X=x_i\right) \\
+p(Y,Z|X,y^L,y^R,z^L,z^R,\beta_Y,\beta_Z,\Sigma_{YZ})&=\prod_{i=1}^n\mathbb{P}\left(y^L_i<Y<y^R_i,z^L_i<Z<z^R_i|X=x_i\right) \\
 &=\prod_{i=1}^n\int_{\log y^L_i}^{\log y^R_i}\int_{\log z^L_i}^{\log z^R_i}\phi(s_Y(u),s_Z(v);\rho)\,dv\,du \\
-&=\prod_{i=1}^n\Big\lbrack\Phi(s_Y(y^R_i),s_Z(z^R_i);\rho)-\Phi(s_Y(y^R_i),s_Z(z^L_i);\rho) \\
-&\qquad{}-\Phi(s_Y(y^L_i),s_Z(z^R_i);\rho)+\Phi(s_Y(y^L_i),s_Z(z^L_i);\rho)\Big\rbrack \\
+&=\prod_{i=1}^n\Big\lbrack\Phi(s_Y(\log y^R_i),s_Z(\log z^R_i);\rho)-\Phi(s_Y(\log y^R_i),s_Z(\log z^L_i);\rho) \\
+&\qquad{}-\Phi(s_Y(\log y^L_i),s_Z(\log z^R_i);\rho)+\Phi(s_Y(\log y^L_i),s_Z(\log z^L_i);\rho)\Big\rbrack \\
 \end{aligned}
 $$
 
-where $s_A(a)=(\log a-x_i^\prime\beta_A)/\sigma_A$ standardizes the logarithmic event time interval bound, $\rho=\sigma^2_{YZ}/(\sigma_Y\sigma_Z)$ is the co-pathway outcomes' correlation, and $\phi(a,b;\rho)$ and $\Phi(a,b;\rho)$ are the standard bivariate normal distribution's PDF and CDF with correlation $\rho$, respectively. The log-normal likelihood is used as it is strictly non-negative and has an increasing variance as the location parameter increases, which are common assumptions in survival analysis.
+where $s_A(a)=(a-x_i^\prime\beta_A)/\sigma_A$ standardizes its argument, $\rho=\sigma^2_{YZ}/(\sigma_Y\sigma_Z)$ is the co-pathway outcomes' correlation, and $\phi(a,b;\rho)$ and $\Phi(a,b;\rho)$ are the standard bivariate normal distribution's PDF and CDF with correlation $\rho$, respectively. The log-normal likelihood is used as it is strictly non-negative and has an increasing variance as the location parameter increases, which are common assumptions in survival analysis.
 
 Given posterior draws for $\beta_Y,\sigma^2_Y,\beta_Z,\sigma^2_Z$, the posterior predictive distributions $Y^*|X^*,Y,X$ and $Z^*|X^*,Z,X$ can be estimated for an individual with treatment/demographics $X^*$. The confusion matrix
 
@@ -71,7 +71,7 @@ can be used to assess the diagnostic accuracy of PSA in predicting PCa progressi
 
 # 3. Prior Distributions
 
-Recall our hierarchical joint specification $\beta_Y,\beta_Z\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta)$ for the relationship between subject covariates and the latent co-pathway outcomes $Y,Z$. To encourage closeness between $\beta_Y$ and $\beta_Z$ in parameter space, we use the informative conjugate prior $(\Sigma_\beta)_{j,j}^{-1}\overset{iid}{\sim}\mathrm{Gamma}(2,1)$ for $j=1,2$ on the precision of each coefficient's difference from the corresponding entry in the latent vector $\beta$. The off-diagonal entries are set to 0 as a simplifying assumption. The non-informative conjugate $\beta_j\overset{iid}{\sim}\mathrm{N}(0, 1000)$, $j=1,\cdots,p$ prior is used for the latent co-pathway demographics-related progression drivers.
+Recall our hierarchical joint specification $\beta_Y,\beta_Z|\beta,\Sigma_\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta)$ for the relationship between subject covariates and the latent co-pathway outcomes $Y,Z$. To encourage closeness between $\beta_Y$ and $\beta_Z$ in parameter space, we use the informative conjugate prior $(\Sigma_\beta)_{j,j}^{-1}\overset{iid}{\sim}\mathrm{Gamma}(2,1)$ for $j=1,2$ on the precision of each coefficient's difference from the corresponding entry in the latent vector $\beta$. The off-diagonal entries are set to 0 as a simplifying assumption. The non-informative conjugate $\beta_j\overset{iid}{\sim}\mathrm{N}(0, 1000)$, $j=1,\cdots,p$ prior is used for the latent co-pathway demographics-related progression drivers.
 
 To jointly model the latent time-to-event outcome covariance matrix $\Sigma_{YZ}$, we use the non-informative $(\Sigma_{YZ})^{-1}\sim\mathrm{Wishart}(2, I_2/2)$ conjugate prior on the precision matrix, where $I_a$ is the $a\times a$ identity. It is the least informative proper Wishart prior, and has expectation $I_2$. These specific choices of prior hyperparameters were chosen by a short simulation study conducted prior to the analysis of real data.
 
