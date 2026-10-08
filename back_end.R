@@ -64,19 +64,19 @@ progression = vsit %>% distinct(SUBJ, VISIT, VISDYTRT) %>% # start with patient/
     by=c("SUBJ" = "SUBJ")
   )
 
-# data-to-posterior pipeline
-fit_model = function(boundsyz,       # n by 2 (y vs z) by 2 (lower vs upper bound) array
-                     x,              # n by p design matrix
-                     m0 = 0,         # mean of global beta vector entries
-                     v0 = 1e+3,      # variance of global beta vector entries
-                     a0 = 2,         # shape parameter of betaYZ precision matrix diagonal
-                     b0 = 1,         # rate parameter of betaYZ precision matrix diagonal
-                     d0 = 2,         # df of SigmaYZ Wishart prior
-                     W0 = diag(2)/2, # scale matrix of SigmaYZ Wishart prior
-                     M = 1e+4,       # number of posterior draws after burn-in
-                     burnin = 1e+4,  # number of burn-in draws
-                     thin = 1        # post burn-in thinning interval
-                     ) {
+# lognormal data-to-posterior model pipeline
+lognorm_model = function(boundsyz,       # n by 2 (y vs z) by 2 (lower vs upper bound) array
+                         x,              # n by p design matrix
+                         m0 = 0,         # mean of global beta vector entries
+                         v0 = 1e+3,      # variance of global beta vector entries
+                         a0 = 2,         # shape parameter of betaYZ precision matrix diagonal
+                         b0 = 1,         # rate parameter of betaYZ precision matrix diagonal
+                         d0 = 2,         # df of SigmaYZ Wishart prior
+                         W0 = diag(2)/2, # scale matrix of SigmaYZ Wishart prior
+                         M = 1e+4,       # number of posterior draws after burn-in
+                         burnin = 1e+4,  # number of burn-in draws
+                         thin = 1        # post burn-in thinning interval
+                         ) {
   model_string = "
   model {
     # data likelihood
@@ -151,11 +151,11 @@ fit_model = function(boundsyz,       # n by 2 (y vs z) by 2 (lower vs upper boun
   )
 }
 
-# sample from posterior predictive distribution to get M by n by 2 array
-sample_ppd = function(x,            # n by p design matrix
-                      betayz_draws, # p by 2 by M array
-                      Sigmayz_draws # 2 by 2 by M array
-                      ) {
+# sample from lognormal model posterior predictive distribution to get M by n by 2 array
+lognorm_sample_ppd = function(x,            # n by p design matrix
+                              betayz_draws, # p by 2 by M array
+                              Sigmayz_draws # 2 by 2 by M array
+                              ) {
   n = nrow(x)
   M = dim(betayz_draws)[3]
   arrapply(1:M, f=\(m){
@@ -167,41 +167,38 @@ sample_ppd = function(x,            # n by p design matrix
   })
 }
 
-# compute confusion matrix from posterior and given covariates
-confusion_matrix = function(x,             # length p vector, one row from design matrix
-                            betayz_draws,  # p by 2 by M array
-                            Sigmayz_draws, # 2 by 2 by M array
-                            t_horizon=365  # clinical horizon of interest (days)
+# compute confusion matrices from posterior predictive distribution (2 by 2 by n output)
+confusion_matrix = function(ppd,          # M by n by 2 array
+                            t_horizon=365 # clinical horizon of interest (days)
                             ) {
-  p = length(x)
-  M = dim(betayz_draws)[3]
-  sample_ppd(matrix(x, nrow=1), betayz_draws, Sigmayz_draws) %>% # M by n (=1) by 2 array
+  n = dim(ppd)[2]
+  ppd %>%
     `<`(t_horizon) %>% # compare simulated event times with time threshold
-    do(\(mat)2*mat[,1,1]+mat[,1,2]) %>% # assign to confusion matrix entries
-    table() %>% # tabulate results
-    do(\(v){ # ensure tabulation is properly populated
-      out = rep(0, 4) %>% setNames(0:3)
-      out[names(v)] = v
-      out
+    do(\(arr)2*arr[,,1,drop=F]+arr[,,2,drop=F]) %>% # M by n by 1 arr of conf mat indices
+    do(\(mat){
+      arrapply(1:n, f=\(i){ # for each sample's corresponding length M vector
+        table(mat[,i,]) %>% # tabulate results by confusion matrix index
+          do(\(v){ # reorder entries as 0,1,2,3
+            out = rep(0, 4) %>% setNames(0:3)
+            out[names(v)] = v
+            out
+          }) %>%
+          matrix(nrow=2, byrow=T) %>% # format into actual 2x2 confusion matrix
+          do(\(tab)tab/sum(tab)) %>% # convert to empirical cell probabilities
+          setDimnames("Y event" = c("N", "Y"), "Z event" = c("N", "Y"))
+      })
     }) %>%
-    matrix(nrow=2, byrow=T) %>% # reformat into 2x2 matrix
-    do(\(tab)tab/sum(tab)) %>% # convert to empirical cell probabilities
-    setDimnames(list("Y" = c("0", "1"), "Z" = c("0", "1"))) # rename table entries
+    aperm(c(2,3,1))
 }
 
 # check calibration by posterior factual interval inclusion probabilities
-calib_interval = function(boundsyz,     # n by 2 (y/z) by 2 (upper/lower bound) array
-                          x,            # n by p design matrix
-                          betayz_draws, # p by 2 by M array
-                          Sigmayz_draws # 2 by 2 by M array
+calib_interval = function(ppd,     # M by n by 2 array
+                          boundsyz # n by 2 (y/z) by 2 (upper/lower bound) array
                           ) {
-  n = nrow(x)
-  p = ncol(x)
-  M = dim(betayz_draws)[3]
-  sample_ppd(x, betayz_draws, Sigmayz_draws) %>% # returns M by n by 2 array
-    do(\(arr){ # compute ppd samples' factual interval inclusion indicators
-      arrapply(1:M, f=\(m)boundsyz[,,1]<=arr[m,,]&arr[m,,]<=boundsyz[,,2])
-    }) %>% # returns M by n by 2 array
+  M = dim(ppd)[1]
+  arrapply(1:M, f=\(m){
+    matrix(boundsyz[,,1]<=ppd[m,,]&ppd[m,,]<=boundsyz[,,2], ncol=2)
+  }) %>% # returns M by n by 2 array
     apply(2:3, mean) %>% # take sample inclusion indicator means across ppd samples
     setDimnames(NULL, c("Y", "Z"))
 }
