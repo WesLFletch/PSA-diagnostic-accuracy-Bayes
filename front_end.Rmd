@@ -11,18 +11,18 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # 1. Scientific Question and Data
 
-Screening for prostate cancer (PCa) is commonly done by taking measures of patients' Prostate-Specific Antigen (PSA) levels, a relatively low-cost and non-invasive procedure. Although it is widely used for initial diagnoses, it may further be a useful indicator of the disease's progression.
+Screening for prostate cancer (PCa) is commonly done by taking measures of patients' Prostate-Specific Antigen (PSA) levels, a relatively low-cost and non-invasive procedure. Although it is widely used for initial diagnoses, its screening must be done deliberately. However, if other common healthcare check-up procedures or health events can provide information about PCa risk, then diagnosis attempts can be made early and administered at clinically motivated times, as opposed to potentially wasting resources through periodic screenings.
 
-We seek to evaluate the diagnostic accuracy of PSA in determining PCa progression through sensitivity and specificity analyses conducted on a longitudinal clinical trial sponsored by AstraZeneca (trial NCT00626548). The trial examined the efficacy of ZD4054 (Zibotentan) in treating non-metastatic hormone resistant PCa. The protected-access de-identified data contains information on subject follow-ups, including XXXXXXXX and XXXXXXX, which serve as proxies for PSA and PCa progression respectively. Note that the PCa progression indicator was not derived using information about PSA, so that their relationship is not inherently tautological but still has a dependence structure.
+We seek to evaluate the diagnostic accuracy of XXXXXXXX in determining PSA progression (a proxy for PCa disease progression) through sensitivity and specificity analyses conducted on a longitudinal clinical trial sponsored by AstraZeneca (trial NCT00626548). The trial examined the efficacy of ZD4054 (Zibotentan) in treating non-metastatic hormone resistant PCa. The protected-access de-identified data contains information on subject follow-ups throughout the longitudinal study, including XXXXXXX, which serves as our potential risk indicator of interest.
 
-If an event occurs, then it is only known to have occurred between the times of the previous and subsequent visits. Further, if it does not occur before the subject's last follow-up date, then it is known only to have occurred after said date. So our knowledge of each subject's event times is restricted to the (in)finite time intervals in which the true event times exist, i.e. our data is interval-censored.
+If a progression event occurs, then it is only known to have occurred between the times of the previous and subsequent visits. Further, if it does not occur before the subject's last follow-up date, then it is known only to have occurred after said date. So our knowledge of each subject's event times is restricted to the (in)finite time intervals in which the true event times exist, i.e. our data is interval-censored.
 
 # 2. Bayesian Model
 
-Define $Y$ and $Z$ to be the respective times of PSA and PCa progression, and $X$ as the vector of treatment and demographic variables. We posit that
+Define $Y$ and $Z$ to be the respective times of PSA and XXXXXXX progression, and $X$ as the $p$-vector of treatment and demographic variables. We posit that
 
 $$
-\log Y,\log Z|X,\beta_Y,\beta_Z,\Sigma_{YZ}\sim\mathrm{N}\left(\mu_{YZ},\Sigma_{YZ}\right)
+\log\begin{bmatrix}Y\\Z\end{bmatrix}|X,\beta_Y,\beta_Z,\Sigma_{YZ}\sim\mathrm{N}\left(\mu_{YZ},\Sigma_{YZ}\right)
 $$
 
 where
@@ -40,42 +40,63 @@ $$
 and
 
 $$
-\beta_Y,\beta_Z|\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta).
+\beta_Y,\beta_Z|\beta,\Sigma_\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta).
 $$
 
-We assume that all subjects are independent, but impose no such assumption on each individual's joint distribution of responses $Y,Z$ so that the latent health/disease progression can jointly drive the PSA and PCa event times, quantified by the covariance parameter $\sigma^2_{YZ}$. The joint hierarchical specification of $\beta_Y,\beta_Z$ is motivated by the knowledge that both PSA and PCa progression should be roughly symmetrically affected by the treatment and demographic covariates, encouraging an informative, near-zero concentrated prior on $\Sigma_\beta$.
+We assume that all subjects are independent, but impose no such assumption on each individual's joint distribution of responses $Y,Z$ so that the latent health/disease progression can jointly drive the PSA and XXXXXXXX event times, quantified by the covariance parameter $\sigma^2_{YZ}$. The joint hierarchical specification of $\beta_Y,\beta_Z$ is motivated by the knowledge that both PSA and XXXXXXXX progression should be roughly symmetrically affected by the treatment and demographic covariates, encouraging an informative, near-zero concentrated prior on the entries of $\Sigma_\beta$.
 
-For $i=1,\cdots,n$ independent subjects, we observe data $(x,y^L,y^R,z^L,z^R)_i$ where $y^L$ and $y^R$ and the left and right endpoints of the event time intervals for $Y$, and $z^L$ and $z^R$ are the analogous interval endpoints of $Z$. The resulting data likelihood is
+For $i=1,\cdots,n$ independent subjects, we observe data $(x,y^L,y^R,z^L,z^R)_i$ where $y^L$ and $y^R$ and the left and right endpoints of the event time intervals for $Y$, and $z^L$ and $z^R$ are the analogous interval endpoints of $Z$. The resulting data likelihood for the latent outcome pair is
 
 $$
 \begin{aligned}
-L(\beta_Y,\beta_Z,\Sigma_{YZ})&=\prod_{i=1}^n\mathbb{P}\left(y^L_i<Y<y^R_i,z^L_i<Z<z^R_i|X=x_i\right) \\
+p((y^L_i,y^R_i,z^L_i,z^R_i)_{i=1,\cdots,n}|X,\beta_Y,\beta_Z,\Sigma_{YZ})&=\prod_{i=1}^n\mathbb{P}\left(y^L_i<Y<y^R_i,z^L_i<Z<z^R_i|X=x_i\right) \\
 &=\prod_{i=1}^n\int_{\log y^L_i}^{\log y^R_i}\int_{\log z^L_i}^{\log z^R_i}\phi(s_Y(u),s_Z(v);\rho)\,dv\,du \\
-&=\prod_{i=1}^n\Big\lbrack\Phi(s_Y(y^R_i),s_Z(z^R_i);\rho)-\Phi(s_Y(y^R_i),s_Z(z^L_i);\rho) \\
-&\qquad{}-\Phi(s_Y(y^L_i),s_Z(z^R_i);\rho)+\Phi(s_Y(y^L_i),s_Z(z^L_i);\rho)\Big\rbrack \\
+&=\prod_{i=1}^n\Big\lbrack\Phi(s_Y(\log y^R_i),s_Z(\log z^R_i);\rho)-\Phi(s_Y(\log y^R_i),s_Z(\log z^L_i);\rho) \\
+&\qquad{}-\Phi(s_Y(\log y^L_i),s_Z(\log z^R_i);\rho)+\Phi(s_Y(\log y^L_i),s_Z(\log z^L_i);\rho)\Big\rbrack \\
 \end{aligned}
 $$
 
-where $s_A(a)=(\log a-x_i^\prime\beta_A)/\sigma_A$ standardizes the logarithmic interval bound, $\rho=\sigma^2_{YZ}/(\sigma_Y\sigma_Z)$, and $\phi(a,b;\rho)$ and $\Phi(a,b;\rho)$ are the standard bivariate normal distribution's PDF and CDF with correlation $\rho$, respectively. The log-normal likelihood is used as it is strictly non-negative and has an increasing variance as the location parameter increases, which are common assumptions in survival analysis.
+where $s_A(a)=(a-x_i^\prime\beta_A)/\sigma_A$ standardizes its argument, $\rho=\sigma^2_{YZ}/(\sigma_Y\sigma_Z)$ is the co-pathway outcomes' correlation, and $\phi(a,b;\rho)$ and $\Phi(a,b;\rho)$ are the standard bivariate normal distribution's PDF and CDF with correlation $\rho$, respectively. The log-normal likelihood is used as it is strictly non-negative and has an increasing variance as the location parameter increases, which are common assumptions in survival analysis.
 
 Given posterior draws for $\beta_Y,\sigma^2_Y,\beta_Z,\sigma^2_Z$, the posterior predictive distributions $Y^*|X^*,Y,X$ and $Z^*|X^*,Z,X$ can be estimated for an individual with treatment/demographics $X^*$. The confusion matrix
 
 |                    |                                    |                                    |
 |-------------------:|-----------------------------------:|-----------------------------------:|
 |                    |                 No PSA Progression |                    PSA Progression |
-| No PCa Progression | $=\mathbb{P}(Y^*<t,Z^*<t|X^*,Y,X)$ | $=\mathbb{P}(Y^*>t,Z^*<t|X^*,Y,X)$ |
-|    PCa Progression | $=\mathbb{P}(Y^*<t,Z^*>t|X^*,Y,X)$ | $=\mathbb{P}(Y^*>t,Z^*>t|X^*,Y,X)$ |
+| No PCa Progression | $=\mathbb{P}(Y^*>t,Z^*>t|X^*,Y,X)$ | $=\mathbb{P}(Y^*<t,Z^*>t|X^*,Y,X)$ |
+|    PCa Progression | $=\mathbb{P}(Y^*>t,Z^*<t|X^*,Y,X)$ | $=\mathbb{P}(Y^*<t,Z^*<t|X^*,Y,X)$ |
 |                    |                                    |                                    |
 
 can be used to assess the diagnostic accuracy of PSA in predicting PCa progression at various clinical horizons $t$ and subject treatments/demographics $X$. We focus on the one-year $(t=365)$ horizon and assess subjects of various treatment/demographics combinations.
 
 # 3. Prior Distributions
 
-Recall our hierarchical joint specification $\beta_Y,\beta_Z\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta)$ for the relationship between subject covariates and the latent co-pathway outcomes $Y,Z$. To encourage closeness between $\beta_Y$ and $\beta_Z$ in parameter space, we use the informative conjugate prior $(\Sigma_\beta)_{j,j}^{-1}\overset{iid}{\sim}\mathrm{Gamma}(2,1)$ for $j=1,2$ on the precision of each coefficient's difference from the corresponding entry in the latent vector $\beta$. The off-diagonal entries are set to 0 as a simplifying assumption. The non-informative conjugate $\beta_j\overset{iid}{\sim}\mathrm{N}(0, 1000)$, $j=1,\cdots,p$ prior is used for the latent co-pathway demographics-related progression drivers.
+Recall our hierarchical joint specification $\beta_Y,\beta_Z|\beta,\Sigma_\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta)$ for the relationship between subject covariates and the latent co-pathway outcomes $Y,Z$. To encourage closeness between $\beta_Y$ and $\beta_Z$ in parameter space, we use the conjugate prior $(\Sigma_\beta)_{j,j}^{-1}\overset{iid}{\sim}\mathrm{Gamma}(a_0,b_0)$ for $j=1,\cdots,p$ on the precision of each coefficient's difference from the corresponding entry in the latent vector $\beta$. The off-diagonal entries are set to 0 as a simplifying assumption. The conjugate $\beta_j\overset{iid}{\sim}\mathrm{N}(m_0, v_0)$, $j=1,\cdots,p$ prior is used for the latent co-pathway demographics-related progression drivers. We consider hyperparameter assignments $a_0=2$, $b_0=1$, $m_0=0$, and $v_0=1000$ as our defaults to encourage small $\Sigma_\beta$ (higher concentration of $\beta_Y,\beta_Z$ around the global $\beta$) and a non-informative $\beta$ prior.
 
-To jointly model the latent time-to-event outcome covariance matrix $\Sigma_{YZ}$, we use the non-informative $(\Sigma_{YZ})^{-1}\sim\mathrm{Wishart}(2, I_2/2)$ conjugate prior on the precision matrix, where $I_a$ is the $a\times a$ identity. It is the least informative proper Wishart prior, and has expectation $I_2$. These specific choices of prior hyperparameters were chosen by a short simulation study conducted prior to the analysis of real data.
+To jointly model the latent time-to-event outcome covariance matrix $\Sigma_{YZ}$, we use the $(\Sigma_{YZ})^{-1}\sim\mathrm{Wishart}(d_0, W_0)$ conjugate prior on the precision matrix with general-use default hyperparameter assignments of $d_0=2$ and $W_0=I_2/2$, which is the least informative proper Wishart prior, and has expectation $I_2$.
+
+The specific choices of default hyperparameters were chosen by a short simulation study conducted prior to the analysis of real data.
 
 # 4. Posterior Computation and Diagnostics
+
+The joint posterior is defined up to a normalizing constant below.
+
+$$
+\begin{aligned}
+&\quad\pi(\beta_Y,\beta_Z,\beta,\Sigma_{YZ},\Sigma_\beta|y^L_i,y^R_i,z^L_i,z^R_i) \\
+\propto&p((y^L_i,y^R_i,z^L_i,z^R_i)_{i=1,\cdots,n}|X,\beta_Y,\beta_Z,\Sigma_{YZ})\times\pi(\beta_Y,\beta_Z|\beta,\Sigma_\beta)\times\pi(\beta)\times\pi(\Sigma_{YZ})\times\pi(\Sigma_\beta) \\
+\propto&\prod_{i=1}^n\Big\lbrack\Phi(s_Y(\log y^R_i),s_Z(\log z^R_i);\rho)-\Phi(s_Y(\log y^R_i),s_Z(\log z^L_i);\rho) \\
+&\qquad{}-\Phi(s_Y(\log y^L_i),s_Z(\log z^R_i);\rho)+\Phi(s_Y(\log y^L_i),s_Z(\log z^L_i);\rho)\Big\rbrack \\
+&\times\det(\Sigma_\beta)^{-1}\exp\left\{-\dfrac{1}{2}\left\lbrack(\beta_Y-\beta)^\prime\Sigma_\beta^{-1}(\beta_Y-\beta)+(\beta_Z-\beta)^\prime\Sigma_\beta^{-1}(\beta_Z-\beta)\right\rbrack\right\} \\
+&\times\exp\left\{-\dfrac{1}{2}(\beta-m_01_p)^\prime v_0^{-1}I_p(\beta-m_01_p)\right\} \\
+&\times\det(\Sigma_{YZ})^{1/2}\exp\{-\text{tr}(2I_2\Sigma_{YZ}^{-1})/2\} \\
+&\times\left\lbrack\prod_{j=1}^p\left(\Sigma_\beta^{-1}\right)_{j,j}\right\rbrack^{\alpha_0-1}\exp\left\{-b_0\times\text{tr}\left(\Sigma_\beta^{-1}\right)\right\}
+\end{aligned}
+$$
+
+Due to the inherent interval-censored outcomes, the posterior is improper and must be sampled from using Metropolis-Hastings and Gibbs sampling techniques. We utilize the R package `rjags` to specify and cyclically extract draws from the full conditional posterior.
+
+DOCUMENT THE POSTERIOR DIAGNOSTICS HERE.
 
 # 5. Posterior Results and Interpretation
 
