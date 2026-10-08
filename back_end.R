@@ -151,23 +151,33 @@ fit_model = function(boundsyz,       # n by 2 (y vs z) by 2 (lower vs upper boun
   )
 }
 
+# sample from posterior predictive distribution to get M by n by 2 array
+sample_ppd = function(x,            # n by p design matrix
+                      betayz_draws, # p by 2 by M array
+                      Sigmayz_draws # 2 by 2 by M array
+                      ) {
+  n = nrow(x)
+  M = dim(betayz_draws)[3]
+  arrapply(1:M, f=\(m){
+    betayz = betayz_draws[,,m]
+    Sigmayz = Sigmayz_draws[,,m]
+    L = chol(Sigmayz)
+    muyz = x%*%betayz
+    exp(muyz+matrix(rnorm(2*n), ncol=2)%*%L)
+  })
+}
+
 # compute confusion matrix from posterior and given covariates
-confusion_matrix = function(x,              # length p vector, one row from design matrix
-                            betayz_draws,   # p by 2 by M array
-                            Sigmayz_draws,  # 2 by 2 by M array
-                            t_horizon=365   # clinical horizon of interest (days)
+confusion_matrix = function(x,             # length p vector, one row from design matrix
+                            betayz_draws,  # p by 2 by M array
+                            Sigmayz_draws, # 2 by 2 by M array
+                            t_horizon=365  # clinical horizon of interest (days)
                             ) {
   p = length(x)
   M = dim(betayz_draws)[3]
-  arrapply(1:M, f=\(m){ # simulate latent Y,Z pair for all posterior draws
-    betayz = betayz_draws[,,m]
-    Sigmayz = Sigmayz_draws[,,m]
-    L = t(chol(Sigmayz))
-    muyz = as.vector(x%*%betayz)
-    as.vector(exp(muyz+L%*%rnorm(2)))
-  }) %>%
+  sample_ppd(matrix(x, nrow=1), betayz_draws, Sigmayz_draws) %>% # M by n (=1) by 2 array
     `<`(t_horizon) %>% # compare simulated event times with time threshold
-    do(\(mat)2*mat[,1]+mat[,2]) %>% # assign joint outcomes to confusion matrix entries
+    do(\(mat)2*mat[,1,1]+mat[,1,2]) %>% # assign to confusion matrix entries
     table() %>% # tabulate results
     do(\(v){ # ensure tabulation is properly populated
       out = rep(0, 4) %>% setNames(0:3)
@@ -180,21 +190,15 @@ confusion_matrix = function(x,              # length p vector, one row from desi
 }
 
 # check calibration by posterior factual interval inclusion probabilities
-calibration = function(boundsyz,     # n by 2 (y vs z) by 2 (lower vs upper bound) array
-                       x,            # n by p design matrix
-                       betayz_draws, # p by 2 by M array
-                       Sigmayz_draws # 2 by 2 by M array
-                       ) {
+calib_interval = function(boundsyz,     # n by 2 (y/z) by 2 (upper/lower bound) array
+                          x,            # n by p design matrix
+                          betayz_draws, # p by 2 by M array
+                          Sigmayz_draws # 2 by 2 by M array
+                          ) {
   n = nrow(x)
   p = ncol(x)
   M = dim(betayz_draws)[3]
-  arrapply(1:M, f=\(m){ # simulate all obs' Y,Z pair for all posterior draws
-    betayz = betayz_draws[,,m]
-    Sigmayz = Sigmayz_draws[,,m]
-    L = chol(Sigmayz)
-    muyz = x%*%betayz
-    exp(muyz+matrix(rnorm(2*n), ncol=2)%*%L)
-  }) %>% # returns M by n by 2 array
+  sample_ppd(x, betayz_draws, Sigmayz_draws) %>% # returns M by n by 2 array
     do(\(arr){ # compute ppd samples' factual interval inclusion indicators
       arrapply(1:M, f=\(m)boundsyz[,,1]<=arr[m,,]&arr[m,,]<=boundsyz[,,2])
     }) %>% # returns M by n by 2 array
