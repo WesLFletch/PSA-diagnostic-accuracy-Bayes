@@ -49,7 +49,7 @@ For $i=1,\cdots,n$ independent subjects, we observe data $(x,y^L,y^R,z^L,z^R)_i$
 
 $$
 \begin{aligned}
-p(Y,Z|X,y^L,y^R,z^L,z^R,\beta_Y,\beta_Z,\Sigma_{YZ})&=\prod_{i=1}^n\mathbb{P}\left(y^L_i<Y<y^R_i,z^L_i<Z<z^R_i|X=x_i\right) \\
+p((y^L_i,y^R_i,z^L_i,z^R_i)_{i=1,\cdots,n}|X,\beta_Y,\beta_Z,\Sigma_{YZ})&=\prod_{i=1}^n\mathbb{P}\left(y^L_i<Y<y^R_i,z^L_i<Z<z^R_i|X=x_i\right) \\
 &=\prod_{i=1}^n\int_{\log y^L_i}^{\log y^R_i}\int_{\log z^L_i}^{\log z^R_i}\phi(s_Y(u),s_Z(v);\rho)\,dv\,du \\
 &=\prod_{i=1}^n\Big\lbrack\Phi(s_Y(\log y^R_i),s_Z(\log z^R_i);\rho)-\Phi(s_Y(\log y^R_i),s_Z(\log z^L_i);\rho) \\
 &\qquad{}-\Phi(s_Y(\log y^L_i),s_Z(\log z^R_i);\rho)+\Phi(s_Y(\log y^L_i),s_Z(\log z^L_i);\rho)\Big\rbrack \\
@@ -71,11 +71,32 @@ can be used to assess the diagnostic accuracy of PSA in predicting PCa progressi
 
 # 3. Prior Distributions
 
-Recall our hierarchical joint specification $\beta_Y,\beta_Z|\beta,\Sigma_\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta)$ for the relationship between subject covariates and the latent co-pathway outcomes $Y,Z$. To encourage closeness between $\beta_Y$ and $\beta_Z$ in parameter space, we use the informative conjugate prior $(\Sigma_\beta)_{j,j}^{-1}\overset{iid}{\sim}\mathrm{Gamma}(2,1)$ for $j=1,2$ on the precision of each coefficient's difference from the corresponding entry in the latent vector $\beta$. The off-diagonal entries are set to 0 as a simplifying assumption. The non-informative conjugate $\beta_j\overset{iid}{\sim}\mathrm{N}(0, 1000)$, $j=1,\cdots,p$ prior is used for the latent co-pathway demographics-related progression drivers.
+Recall our hierarchical joint specification $\beta_Y,\beta_Z|\beta,\Sigma_\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta)$ for the relationship between subject covariates and the latent co-pathway outcomes $Y,Z$. To encourage closeness between $\beta_Y$ and $\beta_Z$ in parameter space, we use the conjugate prior $(\Sigma_\beta)_{j,j}^{-1}\overset{iid}{\sim}\mathrm{Gamma}(a_0,b_0)$ for $j=1,\cdots,p$ on the precision of each coefficient's difference from the corresponding entry in the latent vector $\beta$. The off-diagonal entries are set to 0 as a simplifying assumption. The conjugate $\beta_j\overset{iid}{\sim}\mathrm{N}(m_0, v_0)$, $j=1,\cdots,p$ prior is used for the latent co-pathway demographics-related progression drivers. We consider hyperparameter assignments $a_0=2$, $b_0=1$, $m_0=0$, and $v_0=1000$ as our defaults to encourage small $\Sigma_\beta$ (higher concentration of $\beta_Y,\beta_Z$ around the global $\beta$) and a non-informative $\beta$ prior.
 
-To jointly model the latent time-to-event outcome covariance matrix $\Sigma_{YZ}$, we use the non-informative $(\Sigma_{YZ})^{-1}\sim\mathrm{Wishart}(2, I_2/2)$ conjugate prior on the precision matrix, where $I_a$ is the $a\times a$ identity. It is the least informative proper Wishart prior, and has expectation $I_2$. These specific choices of prior hyperparameters were chosen by a short simulation study conducted prior to the analysis of real data.
+To jointly model the latent time-to-event outcome covariance matrix $\Sigma_{YZ}$, we use the $(\Sigma_{YZ})^{-1}\sim\mathrm{Wishart}(d_0, W_0)$ conjugate prior on the precision matrix with general-use default hyperparameter assignments of $d_0=2$ and $W_0=I_2/2$, which is the least informative proper Wishart prior, and has expectation $I_2$.
+
+The specific choices of default hyperparameters were chosen by a short simulation study conducted prior to the analysis of real data.
 
 # 4. Posterior Computation and Diagnostics
+
+The joint posterior is defined up to a normalizing constant below.
+
+$$
+\begin{aligned}
+&\quad\pi(\beta_Y,\beta_Z,\beta,\Sigma_{YZ},\Sigma_\beta|y^L_i,y^R_i,z^L_i,z^R_i) \\
+\propto&p((y^L_i,y^R_i,z^L_i,z^R_i)_{i=1,\cdots,n}|X,\beta_Y,\beta_Z,\Sigma_{YZ})\times\pi(\beta_Y,\beta_Z|\beta,\Sigma_\beta)\times\pi(\beta)\times\pi(\Sigma_{YZ})\times\pi(\Sigma_\beta) \\
+\propto&\prod_{i=1}^n\Big\lbrack\Phi(s_Y(\log y^R_i),s_Z(\log z^R_i);\rho)-\Phi(s_Y(\log y^R_i),s_Z(\log z^L_i);\rho) \\
+&\qquad{}-\Phi(s_Y(\log y^L_i),s_Z(\log z^R_i);\rho)+\Phi(s_Y(\log y^L_i),s_Z(\log z^L_i);\rho)\Big\rbrack \\
+&\times\det(\Sigma_\beta)^{-1}\exp\left\{-\dfrac{1}{2}\left\lbrack(\beta_Y-\beta)^\prime\Sigma_\beta^{-1}(\beta_Y-\beta)+(\beta_Z-\beta)^\prime\Sigma_\beta^{-1}(\beta_Z-\beta)\right\rbrack\right\} \\
+&\times\exp\left\{-\dfrac{1}{2}(\beta-m_01_p)^\prime v_0^{-1}I_p(\beta-m_01_p)\right\} \\
+&\times\det(\Sigma_{YZ})^{1/2}\exp\{-\text{tr}(2I_2\Sigma_{YZ}^{-1})/2\} \\
+&\times\left\lbrack\prod_{j=1}^p\left(\Sigma_\beta^{-1}\right)_{j,j}\right\rbrack^{\alpha_0-1}\exp\left\{-b_0\times\text{tr}\left(\Sigma_\beta^{-1}\right)\right\}
+\end{aligned}
+$$
+
+Due to the inherent interval-censored outcomes, the posterior is improper and must be sampled from using Metropolis-Hastings and Gibbs sampling techniques. We utilize the R package `rjags` to specify and cyclically extract draws from the full conditional posterior.
+
+DOCUMENT THE POSTERIOR DIAGNOSTICS HERE.
 
 # 5. Posterior Results and Interpretation
 
