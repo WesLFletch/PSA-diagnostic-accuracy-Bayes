@@ -65,14 +65,18 @@ progression = vsit %>% distinct(SUBJ, VISIT, VISDYTRT) %>% # start with patient/
   )
 
 # data-to-posterior pipeline
-fit_model = function(boundsyz,
-                     x,
-                     diagbeta = 1.0e-3*diag(ncol(x)),
-                     diagOmegayz = diag(2)/2,
-                     dfOmegayz = 2,
-                     M = 1e+4,
-                     burnin = 1e+4,
-                     thin = 1) {
+fit_model = function(boundsyz,       # n by 2 (y vs z) by 2 (lower vs upper bound) array
+                     x,              # n by p design matrix
+                     m0 = 0,         # mean of global beta vector entries
+                     v0 = 1e+3,      # variance of global beta vector entries
+                     a0 = 2,         # shape parameter of betaYZ precision matrix diagonal
+                     b0 = 1,         # rate parameter of betaYZ precision matrix diagonal
+                     d0 = 2,         # df of SigmaYZ Wishart prior
+                     W0 = diag(2)/2, # scale matrix of SigmaYZ Wishart prior
+                     M = 1e+4,       # number of posterior draws after burn-in
+                     burnin = 1e+4,  # number of burn-in draws
+                     thin = 1        # post burn-in thinning interval
+                     ) {
   model_string = "
   model {
     # data likelihood
@@ -88,10 +92,10 @@ fit_model = function(boundsyz,
     # priors
     beta ~ dmnorm(mubeta[1:p], diagbeta[1:p,1:p])
     for (j in 1:p) { mubeta[j] = 0 }
-    for (j in 1:p) { tausqbeta[j] ~ dgamma(2, 1) }    # equiv to gamma prior on precision
-    Omegayz ~ dwish(diagOmegayz[1:2,1:2], dfOmegayz)  # Wishart prior on event covariance
+    for (j in 1:p) { tausqbeta[j] ~ dgamma(2, 1) }  # equiv to gamma prior on precision
+    Omegayz ~ dwish(W0[1:2,1:2], d0)                # Wishart prior on event covariance
     # additional posteriors to be returned
-    Sigmayz = inverse(Omegayz)                        # latent outcome covariance matrix
+    Sigmayz = inverse(Omegayz)                      # latent outcome covariance matrix
   }
   "
   n = nrow(x)
@@ -102,9 +106,9 @@ fit_model = function(boundsyz,
     Iyz = matrix(1, nrow=n, ncol=2),
     n = n,
     p = p,
-    diagbeta = diagbeta,
-    diagOmegayz = diagOmegayz,
-    dfOmegayz = dfOmegayz
+    diagbeta = diag(p)/v0,
+    W0 = W0,
+    d0 = d0
   )
   initslist = list(
     betayz = matrix(rep(0, 2*p), ncol=2),
@@ -116,7 +120,7 @@ fit_model = function(boundsyz,
   posterior = coda.samples(
     out_model,
     variable.names=c("betayz", "Sigmayz"),
-    n.iter=M,
+    n.iter=M*thin,
     thin=thin
   )
   list(
@@ -151,7 +155,7 @@ fit_model = function(boundsyz,
 confusion_matrix = function(x,              # length p vector, one row from design matrix
                             betayz_draws,   # p by 2 by M array
                             Sigmayz_draws,  # 2 by 2 by M array
-                            t_horizon=365 # numeric scalar
+                            t_horizon=365   # clinical horizon of interest (days)
                             ) {
   p = length(x)
   M = dim(betayz_draws)[3]
