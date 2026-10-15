@@ -6,6 +6,7 @@ progression = do(f=\(){
   subdir = "D4320C00015 De-Identified RDB Data"
   vsit = haven::read_sas(paste(getwd(), subdir, "r_visit.sas7bdat",  sep="/"))
   demo = haven::read_sas(paste(getwd(), subdir, "r_dem.sas7bdat",    sep="/"))
+  capx = haven::read_sas(paste(getwd(), subdir, "r_caprx.sas7bdat",  sep="/"))
   prog = haven::read_sas(paste(getwd(), subdir, "rd_psa.sas7bdat",   sep="/"))
   secg = haven::read_sas(paste(getwd(), subdir, "r_ecg.sas7bdat",    sep="/"))
   opia = haven::read_sas(paste(getwd(), subdir, "r_opiuse.sas7bdat", sep="/"))
@@ -13,6 +14,11 @@ progression = do(f=\(){
   # SUBJ  is subject identifier
   # VISIT is a numerical visit identifier for each subject
   # vsit$VISDYTRT is number of days since treatment
+  # demo$ETHGRP   is patient ethnic group
+  # demo$AGEGRP   is patient age group
+  # capx$CXCLASS  is patient cancer therapy classification
+  # capx$BISPHOS  is patient bisphosphonate therapy indicator
+  # capx$ANTIANDR is patient anti-androgen therapy indicator
   # prog$PSPCRIT  is indicator of PSA progression
   # secg$ECGEVAL  is indicator of ECG irregularity
   # opia$OPIUSE   is indicator of opiate prescription
@@ -65,6 +71,19 @@ progression = do(f=\(){
     left_join(
       demo %>% distinct(SUBJ, ETHGRP, AGEGRP),
       by=c("SUBJ" = "SUBJ")
+    ) %>%
+    # join cancer therapy variables
+    left_join(
+      capx %>% distinct(SUBJ, CXCLASS, BISPHOS, ANTIANDR),
+      by=c("SUBJ" = "SUBJ")
+    ) %>%
+    # clean up demographic and cancer treatment variables
+    mutate(
+      ETHGRP = as.factor(ETHGRP),
+      AGEGRP = as.factor(AGEGRP),
+      CXCLASS = as.factor(replace_when(CXCLASS, CXCLASS=="" ~ "none")),
+      BISPHOS = as.numeric(BISPHOS),
+      ANTIANDR = as.numeric(ANTIANDR)
     )
 })
 
