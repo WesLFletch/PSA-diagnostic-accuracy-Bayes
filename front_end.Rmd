@@ -17,6 +17,8 @@ We seek to evaluate the diagnostic accuracy of XXXXXXXX in determining PSA progr
 
 If a progression event occurs, then it is only known to have occurred between the times of the previous and subsequent visits. Further, if it does not occur before the subject's last follow-up date, then it is known only to have occurred after said date. So our knowledge of each subject's event times is restricted to the (in)finite time intervals in which the true event times exist, i.e. our data is interval-censored.
 
+An important indicator for metastatic progression is the development of new lesions, evaluated by various scans, and then determined to be disease progression or not. "RNNEWLES" which identifies if any new lesions have appeared since baseline is measured in the data and is of interest to us in order to evaluate disease progression. Since this is measured since baseline, we are able to get an accurate read on whether or not disease progression was detected by these scans within the requested timeline of 1 year of being on study. 
+
 # 2. Bayesian Model
 
 Define $Y$ and $Z$ to be the respective times of PSA and XXXXXXX progression, and $X$ as the $p$-vector of treatment and demographic variables. We posit that
