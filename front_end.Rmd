@@ -98,6 +98,10 @@ $$
 
 Due to the inherent interval-censored outcomes, the posterior is improper and must be sampled from using Metropolis-Hastings and Gibbs sampling techniques. We utilize the R package `rjags` to specify and cyclically extract draws from the full conditional posterior.
 
+It should be noted that to improve posterior stability in the right-censored cases, the observed upper bounds are set to the minimum of the factual upper bounds and 2000. Similarly, the lower bounds are the minimum of the factual lower bound and 1000.
+
+DOCUMENT THE MCMC SPECS (e.g. num chains, iterations, thinning, etc) HERE.
+
 DOCUMENT THE POSTERIOR DIAGNOSTICS HERE.
 
 # 5. Posterior Results and Interpretation
