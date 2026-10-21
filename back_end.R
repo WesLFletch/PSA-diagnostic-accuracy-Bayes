@@ -225,3 +225,54 @@ calib_interval = function(ppd,     # M by n by 2 array
     apply(2:3, mean) %>% # take sample inclusion indicator means across ppd samples
     setDimnames(NULL, c("Y", "Z"))
 }
+
+# produce posterior trace and acf plots for one or multiple chains
+posterior_diagnostics = function(..., # one or multiple posterior chains
+                                 lag_max # maximum lag when calculating ACF
+                                 ) {
+  chains = list(...)
+  nchains = length(chains)
+  trace_plot = lapply(1:nchains, \(i){
+    tibble(Chain = i, `Posterior Draw` = chains[[i]]) %>% mutate(Iteration = row_number())
+  }) %>%
+    reduce(rbind) %>%
+    mutate(Chain = factor(Chain)) %>%
+    ggplot(aes(x=Iteration, y=`Posterior Draw`, color=Chain)) +
+    geom_line() +
+    theme_bw()
+  acf_plot = lapply(1:nchains, \(i){
+    acf(chains[[i]], lag.max=lag_max, plot=F)$acf %>%
+      as.vector() %>%
+      do(\(x)tibble(Chain = i, Lag = 1:length(x)-1, `ACF(Lag)` = unname(x)))
+  }) %>%
+    reduce(rbind) %>%
+    mutate(Chain = factor(Chain)) %>%
+    ggplot(aes(x=Lag, y=`ACF(Lag)`, color=Chain)) +
+    geom_point(shape=1) +
+    geom_line(linewidth=0.5) +
+    ylim(c(0, 1)) +
+    theme_bw()
+  ESS = sapply(chains, \(chain){
+    M = length(chain)
+    rho = acf(chain, lag.max=lag_max, plot=F)$acf %>% as.vector() %>% tail(-1)
+    M/(1+2*sum(rho))
+  })
+  MCSE = sapply(1:nchains, \(i){
+    sd(chains[[i]])/sqrt(ESS[i])
+  })
+  Gelman_Rubin = if (nchains==1) NA else do(f=\(){
+    M = length(chains[[1]])
+    xbar = sapply(chains, mean)
+    xbarstar = mean(xbar)
+    B = M*sum((xbar-xbarstar)^2)/(nchains-1)
+    W = sum(sapply(1:nchains, \(i)sum((chains[[i]]-xbar[i])^2)/(M-1)))/nchains
+    ((W*(M-1)/M)+(B/M))/W
+  })
+  list(
+    trace_plot = trace_plot,
+    acf_plot = acf_plot,
+    ESS = ESS,
+    MCSE = MCSE,
+    Gelman_Rubin = Gelman_Rubin
+  )
+}
