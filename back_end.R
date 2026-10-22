@@ -227,7 +227,7 @@ calib_interval = function(ppd,     # M by n by 2 array
 }
 
 # produce posterior trace and acf plots for one or multiple chains
-posterior_diagnostics = function(..., # one or multiple posterior chains
+posterior_diagnostics = function(...,    # one or multiple parallel posterior chains
                                  lag_max # maximum lag when calculating ACF
                                  ) {
   chains = list(...)
