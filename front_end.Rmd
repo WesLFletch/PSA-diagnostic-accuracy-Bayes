@@ -85,7 +85,7 @@ The joint posterior is defined up to a normalizing constant below.
 
 $$
 \begin{aligned}
-&\quad\pi(\beta_Y,\beta_Z,\beta,\Sigma_{YZ},\Sigma_\beta|y^L_i,y^R_i,z^L_i,z^R_i) \\
+&\pi(\beta_Y,\beta_Z,\beta,\Sigma_{YZ},\Sigma_\beta|y^L_i,y^R_i,z^L_i,z^R_i) \\
 \propto&p((y^L_i,y^R_i,z^L_i,z^R_i)_{i=1,\cdots,n}|X,\beta_Y,\beta_Z,\Sigma_{YZ})\times\pi(\beta_Y,\beta_Z|\beta,\Sigma_\beta)\times\pi(\beta)\times\pi(\Sigma_{YZ})\times\pi(\Sigma_\beta) \\
 \propto&\prod_{i=1}^n\Big\lbrack\Phi(s_Y(\log y^R_i),s_Z(\log z^R_i);\rho)-\Phi(s_Y(\log y^R_i),s_Z(\log z^L_i);\rho) \\
 &\qquad{}-\Phi(s_Y(\log y^L_i),s_Z(\log z^R_i);\rho)+\Phi(s_Y(\log y^L_i),s_Z(\log z^L_i);\rho)\Big\rbrack \\
@@ -97,6 +97,10 @@ $$
 $$
 
 Due to the inherent interval-censored outcomes, the posterior is improper and must be sampled from using Metropolis-Hastings and Gibbs sampling techniques. We utilize the R package `rjags` to specify and cyclically extract draws from the full conditional posterior.
+
+It should be noted that to improve posterior stability in the right-censored cases, the observed upper bounds are set to the minimum of the factual upper bounds and 2000. Similarly, the lower bounds are the minimum of the factual lower bound and 1000.
+
+DOCUMENT THE MCMC SPECS (e.g. num chains, iterations, thinning, etc) HERE.
 
 DOCUMENT THE POSTERIOR DIAGNOSTICS HERE.
 
