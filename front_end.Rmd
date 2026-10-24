@@ -128,6 +128,18 @@ Peyton, please define your model, specify/justify choices of priors, and perform
 
 ## Bayesian Justification
 
+We are motivated towards a Bayesian approach due to three primary characteristics of our research objective.
+
+First, our data is inherently interval-censored, which makes Frequentist maximum likelihood estimation difficult in a parametric setting, which we posit as important for incorporating co-pathway information about the joint outcomes that are not controlled for by demographic or cancer treatment information (i.e. the latent disease progression). Non-parametric Frequentist survival estimators would not be able to incorporate such information as elegantly in this pseudo-matched-pairs setting.
+
+Second, the recovery of the joint conditional time-to-event outcomes is required for our study outcome measures. The Bayesian approach nicely facilitates this with appropriate uncertainty quantification by simulation from the posterior predictive distribution.
+
+And third, our desire to incorporate assumptions about the common effects of demographic and cancer treatment information on the co-pathway outcomes into the model requires a hierarchical formulation of the regression parameter distributions, an approach that is exclusive to the Bayesian philosophy.
+
+To illustrate the advantages of our Bayesian approach, we consider a competing Frequentist approach in a simulation study where the true sample event times are known.
+
+WES NOTE: DEFINE AND CONDUCT THE SIMULATION STUDY HERE. COMPARE A FREQUENTIST AND BOTH BAYESIAN METHODS ON THE SYNTHETIC DATA.
+
 # 8. Innovation or Extension
 
 ## Joint Hierarchical Regression Structure
