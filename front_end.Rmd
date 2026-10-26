@@ -136,9 +136,25 @@ Second, the recovery of the joint conditional time-to-event outcomes is required
 
 And third, our desire to incorporate assumptions about the common effects of demographic and cancer treatment information on the co-pathway outcomes into the model requires a hierarchical formulation of the regression parameter distributions, an approach that is exclusive to the Bayesian philosophy.
 
+## Simulation Study
+
 To illustrate the advantages of our Bayesian approach, we consider a competing Frequentist approach in a simulation study where the true sample event times are known.
 
-WES NOTE: DEFINE AND CONDUCT THE SIMULATION STUDY HERE. COMPARE A FREQUENTIST AND BOTH BAYESIAN METHODS ON THE SYNTHETIC DATA.
+The competing frequentist model is
+
+$$
+\log\begin{bmatrix}Y\\Z\end{bmatrix}|x\sim\mathrm{N}_2\left(\begin{bmatrix}\beta_Y^\prime\\ \beta_Z^\prime\end{bmatrix}x,\text{diag}(\sigma^2_Y,\sigma^2_Z)\right)
+$$
+
+which is equivalent to two independent linear regressions of $Y$ and $Z$ on $x$.
+
+For each simulation, we sample $n=600$ realizations of the $p=10$-vector $x_i\overset{iid}{\sim}\mathrm{N}_p(\vec 0_p,v_0I_p)|_{i=1,\cdots,n}$. Denote the full data covariates $X\in\mathbb{R}^{n\times p}$. Fix $\beta=(\beta_j)^\prime_{j=1,\cdots,p}$ where $\beta_j=(-1)^{\mathbb{I}(j\leq p/2)}$. We draw assignments $\beta_Y,\beta_Z\overset{iid}{\sim}\mathrm{N}_p(\beta,\Sigma_\beta)$. Latent log-event times $(\log Y, \log Z)_i^\prime$ are jointly drawn from $\mathrm{N}_2(5+x_i^\prime\begin{bmatrix}\beta_Y,\beta_Z\end{bmatrix}, \Sigma_{YZ})$. Observed lower event-time interval bounds are $y^L_i=\min\{100\lfloor Y_i/100\rfloor,500\}$, and upper bounds are $y^R_i=\min\{a\in\{100,200,300,400,500,2000\}|a\geq\min\{Y,2000\}\}$. $z^L_i$ and $z^R_i$ are assigned symmetrically. The resulting observed data used by the examined methods per-simulation is $(X,y^L_i,y^R_i,z^L_i,z^R_i)$.
+
+The Bayesian methods are performed on the data as described earlier in the text, with the exception of running a single chain of length 10000 instead of 4 of length 2500, as we find that our posteriors converge in the real data (less ideal) case. This was done to ease the computational burden under repeated simulation. The Frequentist approach optimizes its respective likelihood (which is withheld due to being largely analogous with the Bayesian data likelihood) with respect to parameters $\beta_Y,\beta_Z,\sigma^2_Y,\sigma^2_Z$. All models include an intercept term to capture the event time offset included in the simulation procedure.
+
+The frequentist approach returns fitted values for the latent $Y,Z$ pair per sample, and we use the posterior mean of each sample's posterior predictive distribution as the corresponding latent outcome pair point estimates for the Bayesian methods. Methods are compared by the mean squared log-difference between estimated and actual event times for $Y$ and $Z$, analogous to MSE on the log-time-to-event scale.
+
+We perform (HOW MANY?) simulation replications under parameters $v_o=1$, $\Sigma_\beta=I_p/2$, and $\Sigma_{YZ}=((2,1)^\prime,(1,2)^\prime)$.
 
 # 8. Innovation or Extension
 
