@@ -284,3 +284,64 @@ posterior_diagnostics = function(...,    # one or multiple parallel posterior ch
     Gelman_Rubin = Gelman_Rubin
   )
 }
+
+# Simulation study ------------------------------------------------------------------
+
+# perform full simulation study
+sim_study = function(repl = 50, # number of simulation replications
+                     ...        # additional arguments to pass to make_data (see inside)
+                     ) {
+  # synthetic data generation
+  make_data = function(n = 600, p = 10, v0 = 1, sigmasqbeta = 1/4, Sigmayz = 1+diag(2)) {
+    intervals = seq(from=0, to=500, by=100)
+    beta = c(rep(-1, p/2), rep(1, p/2))
+    betay = rnorm(p, mean=beta, sd=sqrt(sigmasqbeta))
+    betaz = rnorm(p, mean=beta, sd=sqrt(sigmasqbeta))
+    x = matrix(rnorm(n*p, sd=sqrt(v0)), nrow=n)
+    yz = arrapply(1:n, f=\(i){
+      exp(MASS::mvrnorm(1, mu=5+x[i,]%*%cbind(betay, betaz), Sigma=Sigmayz))
+    })
+    boundsyz = arrapply(1:n, 1:2, f=\(i,j)c(
+      max(max(intervals[intervals<yz[i,j]]), 1e-5),
+      min(intervals[intervals>=yz[i,j]], 2000)
+    ))
+    return(list(
+      beta = beta,
+      betay = betay,
+      betaz = betaz,
+      x = x,
+      yz = yz,
+      boundsyz = boundsyz
+    ))
+  }
+  # frequentist method, returns fitted values
+  frequentist_model = function(boundsyz, x) {
+    p = ncol(x)
+    sapply(1:2, \(j){
+      cbind(x, boundsyz[,j,] %>% setColnames(c("lb", "rb"))) %>%
+        as.data.frame() %>%
+        survreg(Surv(lb, rb, type="interval2")~., data=., dist="lognormal") %>%
+        fitted.values()
+    })
+  }
+  # one replication of the simulation study
+  one_sim = function(...) {
+    data = make_data(...)
+    true_event_times = data$yz
+    freq_event_times = frequentist_model(data$boundsyz, data$x)
+    logn_event_times = lognorm_model(data$boundsyz, cbind(1, data$x)) %>%
+      do(\(post)lognorm_sample_ppd(cbind(1, data$x), post$betayz, post$Sigmayz)) %>%
+      apply(2:3, \(v)exp(mean(log(v))))
+    gamma_event_times = matrix(NA, nrow=nrow(data$x), ncol=2) # TODO: IMPLEMENT LATER.
+    arrapply(list(freq_event_times, logn_event_times, gamma_event_times), f=\(est_event_times){
+      apply(log(est_event_times)-log(true_event_times), 2, \(v)sqrt(mean(v^2)))
+    })
+  }
+  # perform all replications of the study
+  arrapply(1:repl, f=\(m)one_sim(...)) %>%
+    setDimnames(
+      as.character(1:repl),
+      c("Frequentist LogNormal", "Bayes LogNormal", "Bayes LogGamma"),
+      c("Y", "Z")
+    )
+}
