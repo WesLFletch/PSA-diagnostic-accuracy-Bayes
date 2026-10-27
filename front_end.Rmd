@@ -154,7 +154,7 @@ The Bayesian methods are performed on the data as described earlier in the text,
 
 The frequentist approach returns fitted values for the latent $Y,Z$ pair per sample, and we use the exponential of the log-posterior predictive distribution mean as the Bayesian point estimate for the latent outcomes. Exponentiating the log-scale mean is far more numerically stable than using the mean of the raw posterior predictive distribution, and in line with common survival analysis practice. Methods are compared by the root mean squared difference between estimated and actual log-event times for $Y$ and $Z$, analogous to RMSE on the log-time-to-event scale.
 
-We perform 20 simulation replications under parameters $v_o=1$, $\Sigma_\beta=I_p/4$, and $\Sigma_{YZ}=((2,1)^\prime,(1,2)^\prime)$. The results are presented in terms of bivariate density estimates of the joint prediction error of $Y$ and $Z$ to highlight not only relative performance, but also the error dependency relationship which is important for our research question.
+We perform 50 simulation replications under parameters $v_o=1$, $\Sigma_\beta=I_p/4$, and $\Sigma_{YZ}=((2,1)^\prime,(1,2)^\prime)$. The results are presented in terms of per-simulation error comparisons between the three methods.
 
 # 8. Innovation or Extension
 
