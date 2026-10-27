@@ -11,17 +11,21 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # 1. Scientific Question and Data
 
-Screening for prostate cancer (PCa) is commonly done by taking measures of patients' Prostate-Specific Antigen (PSA) levels, a relatively low-cost and non-invasive procedure. Although it is widely used for initial diagnoses, its screening must be done deliberately. However, if other common healthcare check-up procedures or health events can provide information about PCa risk, then diagnosis attempts can be made early and administered at clinically motivated times, as opposed to potentially wasting resources through periodic screenings.
+## Background
 
-We seek to evaluate the diagnostic accuracy of XXXXXXXX in determining PSA progression (a proxy for PCa disease progression) through sensitivity and specificity analyses conducted on a longitudinal clinical trial sponsored by AstraZeneca (trial NCT00626548). The trial examined the efficacy of ZD4054 (Zibotentan) in treating non-metastatic hormone resistant PCa. The protected-access de-identified data contains information on subject follow-ups throughout the longitudinal study, including XXXXXXX, which serves as our potential risk indicator of interest.
+Screening for prostate cancer (PCa) is commonly done by taking measures of patients' Prostate-Specific Antigen (PSA) levels, a relatively low-cost and non-invasive procedure. Although it is widely used for initial diagnoses, it may also be useful in determining further disease progression longitudinally following diagnosis in lieu of more costly and invasive methods.
+
+## Objective and Data Overview
+
+We seek to evaluate the diagnostic accuracy of the PSA blood test in determining PCa progression post-diagnosis through sensitivity and specificity analyses conducted on a longitudinal clinical trial sponsored by AstraZeneca (trial NCT00626548). The trial examined the efficacy of ZD4054 (Zibotentan) in treating non-metastatic hormone resistant PCa. The protected-access de-identified data contains information on subject follow-ups throughout the longitudinal study, including longitudinal PSA blood test results and screenings for additional lesions since diagnosis (our proxy for true PCa progression), as well as subject demographic and treatment information. Our measures of interest relate to the joint distribution of event times of first progression as detectable by PSA blood test and screening for new lesions.
+
+## Interval-Censored Longitudinal Data
 
 If a progression event occurs, then it is only known to have occurred between the times of the previous and subsequent visits. Further, if it does not occur before the subject's last follow-up date, then it is known only to have occurred after said date. So our knowledge of each subject's event times is restricted to the (in)finite time intervals in which the true event times exist, i.e. our data is interval-censored.
 
-An important indicator for metastatic progression is the development of new lesions, evaluated by various scans, and then determined to be disease progression or not. "RNNEWLES" which identifies if any new lesions have appeared since baseline is measured in the data and is of interest to us in order to evaluate disease progression. Since this is measured since baseline, we are able to get an accurate read on whether or not disease progression was detected by these scans within the requested timeline of 1 year of being on study. 
+# 2. Bayesian Model: Latent Hierarchical Joint Log-Normal Regression
 
-# 2. Bayesian Model
-
-Define $Y$ and $Z$ to be the respective times of PSA and XXXXXXX progression, and $X$ as the $p$-vector of treatment and demographic variables. We posit that
+Define $Y$ and $Z$ to be the respective latent times of PSA and PCa progression, and $X$ as the $p$-vector of treatment and demographic variables. We posit that
 
 $$
 \log\begin{bmatrix}Y\\Z\end{bmatrix}|X,\beta_Y,\beta_Z,\Sigma_{YZ}\sim\mathrm{N}\left(\mu_{YZ},\Sigma_{YZ}\right)
@@ -34,8 +38,8 @@ $$
 X^\prime\beta_Z\end{bmatrix},
 \qquad
 \Sigma_{YZ}=\begin{bmatrix}
-\sigma^2_Y & \sigma^2_{YZ} \\
-\sigma^2_{YZ} & \sigma^2_Z
+\sigma^2_Y & \sigma_{YZ} \\
+\sigma_{YZ} & \sigma^2_Z
 \end{bmatrix}
 $$
 
@@ -45,7 +49,9 @@ $$
 \beta_Y,\beta_Z|\beta,\Sigma_\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta).
 $$
 
-We assume that all subjects are independent, but impose no such assumption on each individual's joint distribution of responses $Y,Z$ so that the latent health/disease progression can jointly drive the PSA and XXXXXXXX event times, quantified by the covariance parameter $\sigma^2_{YZ}$. The joint hierarchical specification of $\beta_Y,\beta_Z$ is motivated by the knowledge that both PSA and XXXXXXXX progression should be roughly symmetrically affected by the treatment and demographic covariates, encouraging an informative, near-zero concentrated prior on the entries of $\Sigma_\beta$.
+We assume that all subjects are independent, but impose no such assumption on each individual's joint distribution of responses $Y,Z$ so that the latent health/disease progression can jointly drive the PSA and PCa progression event times, quantified by the covariance parameter $\sigma_{YZ}$. The joint hierarchical specification of $\beta_Y,\beta_Z$ is motivated by the knowledge that both PSA and PCa progression should be roughly symmetrically affected by the treatment and demographic covariates, encouraging an informative, near-zero concentrated prior on the entries of $\Sigma_\beta$.
+
+## Conditional Data Likelihood
 
 For $i=1,\cdots,n$ independent subjects, we observe data $(x,y^L,y^R,z^L,z^R)_i$ where $y^L$ and $y^R$ and the left and right endpoints of the event time intervals for $Y$, and $z^L$ and $z^R$ are the analogous interval endpoints of $Z$. The resulting data likelihood for the latent outcome pair is
 
@@ -58,7 +64,9 @@ p((y^L_i,y^R_i,z^L_i,z^R_i)_{i=1,\cdots,n}|X,\beta_Y,\beta_Z,\Sigma_{YZ})&=\prod
 \end{aligned}
 $$
 
-where $s_A(a)=(a-x_i^\prime\beta_A)/\sigma_A$ standardizes its argument, $\rho=\sigma^2_{YZ}/(\sigma_Y\sigma_Z)$ is the co-pathway outcomes' correlation, and $\phi(a,b;\rho)$ and $\Phi(a,b;\rho)$ are the standard bivariate normal distribution's PDF and CDF with correlation $\rho$, respectively. The log-normal likelihood is used as it is strictly non-negative and has an increasing variance as the location parameter increases, which are common assumptions in survival analysis.
+where $s_A(a)=(a-x_i^\prime\beta_A)/\sigma_A$ standardizes its argument, $\rho=\sigma_{YZ}/(\sigma_Y\sigma_Z)$ is the co-pathway outcomes' correlation, and $\phi(a,b;\rho)$ and $\Phi(a,b;\rho)$ are the standard bivariate normal distribution's PDF and CDF with correlation $\rho$, respectively. The log-normal likelihood is used as it has a strictly non-negative support and an increasing variance as the location parameter increases, which are common assumptions in survival analysis.
+
+## Analysis Outcome Measures
 
 Given posterior draws for $\beta_Y,\sigma^2_Y,\beta_Z,\sigma^2_Z$, the posterior predictive distributions $Y^*|X^*,Y,X$ and $Z^*|X^*,Z,X$ can be estimated for an individual with treatment/demographics $X^*$. The confusion matrix
 
@@ -70,6 +78,8 @@ Given posterior draws for $\beta_Y,\sigma^2_Y,\beta_Z,\sigma^2_Z$, the posterior
 |                    |                                    |                                    |
 
 can be used to assess the diagnostic accuracy of PSA in predicting PCa progression at various clinical horizons $t$ and subject treatments/demographics $X$. We focus on the one-year $(t=365)$ horizon and assess subjects of various treatment/demographics combinations.
+
+The posterior distribution of $\rho=\sigma_{YZ}/(\sigma_Y\sigma_Z)$ quantifies the strength of the co-pathway relationship between PSA and PCa progression. We examine this posterior as a heuristic to support the contingency table analysis.
 
 # 3. Prior Distributions
 
@@ -100,9 +110,9 @@ Due to the inherent interval-censored outcomes, the posterior is improper and mu
 
 It should be noted that to improve posterior stability in the right-censored cases, the observed upper bounds are set to the minimum of the factual upper bounds and 2000. Similarly, the lower bounds are the minimum of the factual lower bound and 1000.
 
-DOCUMENT THE MCMC SPECS (e.g. num chains, iterations, thinning, etc) HERE.
+Through repeated experimentation, we settle on computing 4 chains each with 2500 posterior draws following a thinning rate of 4 and 1000 burn-in draws to balance computation time, convergence testing capability, effective sample size, and memory usage.
 
-DOCUMENT THE POSTERIOR DIAGNOSTICS HERE.
+DOCUMENT THE POSTERIOR DIAGNOSTICS HERE, LIKE ACTUALLY DO IT IN SOFTWARE.
 
 # 5. Posterior Results and Interpretation
 
@@ -110,6 +120,44 @@ DOCUMENT THE POSTERIOR DIAGNOSTICS HERE.
 
 # 7. Alternative Analysis, Comparison, and Bayesian Justification
 
+## Alternative Model
+
+Peyton, please define your model, specify/justify choices of priors, and perform the computation / diagnostics / results here.
+
+## Model Comparisons
+
+## Bayesian Justification
+
+We are motivated towards a Bayesian approach due to three primary characteristics of our research objective.
+
+First, our data is inherently interval-censored, which makes Frequentist maximum likelihood estimation difficult in a parametric setting, which we posit as important for incorporating co-pathway information about the joint outcomes that are not controlled for by demographic or cancer treatment information (i.e. the latent disease progression). Non-parametric Frequentist survival estimators would not be able to incorporate such information as elegantly in this pseudo-matched-pairs setting.
+
+Second, the recovery of the joint conditional time-to-event outcomes is required for our study outcome measures. The Bayesian approach nicely facilitates this with appropriate uncertainty quantification by simulation from the posterior predictive distribution.
+
+And third, our desire to incorporate assumptions about the common effects of demographic and cancer treatment information on the co-pathway outcomes into the model requires a hierarchical formulation of the regression parameter distributions, an approach that is exclusive to the Bayesian philosophy.
+
+## Simulation Study
+
+To illustrate the advantages of our Bayesian approach, we consider a competing Frequentist approach in a simulation study where the true sample event times are known.
+
+The competing frequentist model is
+
+$$
+\log\begin{bmatrix}Y\\Z\end{bmatrix}|x\sim\mathrm{N}_2\left(\begin{bmatrix}\beta_Y^\prime\\ \beta_Z^\prime\end{bmatrix}x,\text{diag}(\sigma^2_Y,\sigma^2_Z)\right)
+$$
+
+which is equivalent to two independent linear regressions of $Y$ and $Z$ on $x$.
+
+For each simulation, we sample $n=600$ realizations of the $p=10$-vector $x_i\overset{iid}{\sim}\mathrm{N}_p(\vec 0_p,v_0I_p)|_{i=1,\cdots,n}$. Denote the full data covariates $X\in\mathbb{R}^{n\times p}$. Fix $\beta=(\beta_j)^\prime_{j=1,\cdots,p}$ where $\beta_j=(-1)^{\mathbb{I}(j\leq p/2)}$. We draw assignments $\beta_Y,\beta_Z\overset{iid}{\sim}\mathrm{N}_p(\beta,\Sigma_\beta)$. Latent log-event times $(\log Y, \log Z)_i^\prime$ are jointly drawn from $\mathrm{N}_2(5+x_i^\prime\begin{bmatrix}\beta_Y,\beta_Z\end{bmatrix}, \Sigma_{YZ})$. Observed lower event-time interval bounds are $y^L_i=\min\{100\lfloor Y_i/100\rfloor,500\}$, and upper bounds are $y^R_i=\min\{a\in\{100,200,300,400,500,2000\}|a\geq\min\{Y,2000\}\}$. $z^L_i$ and $z^R_i$ are assigned symmetrically. The resulting observed data used by the examined methods per-simulation is $(X,y^L_i,y^R_i,z^L_i,z^R_i)$.
+
+The Bayesian methods are performed on the data as described earlier in the text, with the exception of running a single chain of length 1000 with no thinning instead of 4 of length 2500 with a thinning rate of 4. This was done to ease the computational burden under repeated simulation, and we find no issues with posterior convergence under these MCMC parameters. The Frequentist approach optimizes its respective likelihood (which is withheld due to being largely analogous with the Bayesian data likelihood) with respect to parameters $\beta_Y,\beta_Z,\sigma^2_Y,\sigma^2_Z$, implemented using the `survival` package. All models include an intercept term to capture the event time offset included in the simulation procedure.
+
+The frequentist approach returns fitted values for the latent $Y,Z$ pair per sample, and we use the exponential of the log-posterior predictive distribution mean as the Bayesian point estimate for the latent outcomes. Exponentiating the log-scale mean is far more numerically stable than using the mean of the raw posterior predictive distribution, and in line with common survival analysis practice. Methods are compared by the root mean squared difference between estimated and actual log-event times for $Y$ and $Z$, analogous to RMSE on the log-time-to-event scale.
+
+We perform 50 simulation replications under parameters $v_o=1$, $\Sigma_\beta=I_p/4$, and $\Sigma_{YZ}=((2,1)^\prime,(1,2)^\prime)$. The results are presented in terms of per-simulation error comparisons between the three methods.
+
 # 8. Innovation or Extension
+
+## Joint Hierarchical Regression Structure
 
 # References
