@@ -2,6 +2,8 @@ library("rjags")
 library("tidyverse")
 library("PipeHelpR") # devtools::install_github("WesLFletch/PipeHelpR")
 
+# Compute real data -----------------------------------------------------------------
+
 progression = do(f=\(){
   subdir = "D4320C00015 De-Identified RDB Data"
   vsit = haven::read_sas(paste(getwd(), subdir, "r_visit.sas7bdat",  sep="/"))
@@ -86,6 +88,8 @@ progression = do(f=\(){
       ANTIANDR = as.numeric(ANTIANDR)
     )
 })
+
+# Lognormal model -------------------------------------------------------------------
 
 # lognormal data-to-posterior model pipeline
 lognorm_model = function(boundsyz,       # n by 2 (y vs z) by 2 (lower vs upper bound) array
@@ -190,6 +194,8 @@ lognorm_sample_ppd = function(x,            # n by p design matrix
   })
 }
 
+# Study outcomes --------------------------------------------------------------------
+
 # compute confusion matrices from posterior predictive distribution (2 by 2 by n output)
 confusion_matrix = function(ppd,          # M by n by 2 array
                             t_horizon=365 # clinical horizon of interest (days)
@@ -213,6 +219,8 @@ confusion_matrix = function(ppd,          # M by n by 2 array
     }) %>%
     aperm(c(2,3,1))
 }
+
+# Calibration and diagnostic checks -------------------------------------------------
 
 # check calibration by posterior factual interval inclusion probabilities
 calib_interval = function(ppd,     # M by n by 2 array
