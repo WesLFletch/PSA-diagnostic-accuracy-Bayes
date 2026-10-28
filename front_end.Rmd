@@ -130,11 +130,11 @@ Peyton, please define your model, specify/justify choices of priors, and perform
 
 We are motivated towards a Bayesian approach due to three primary characteristics of our research objective.
 
-First, our data is inherently interval-censored, which makes Frequentist maximum likelihood estimation difficult in a parametric setting, which we posit as important for incorporating co-pathway information about the joint outcomes that are not controlled for by demographic or cancer treatment information (i.e. the latent disease progression). Non-parametric Frequentist survival estimators would not be able to incorporate such information as elegantly in this pseudo-matched-pairs setting.
+First, our data is inherently interval-censored, which makes it desirable for us to incorporate uncertainty induced by the reduced data information into our parameter estimation. Frequentist estimators would not be able to incorporate parameter uncertainty as elegantly in this context.
 
 Second, the recovery of the joint conditional time-to-event outcomes is required for our study outcome measures. The Bayesian approach nicely facilitates this with appropriate uncertainty quantification by simulation from the posterior predictive distribution.
 
-And third, our desire to incorporate assumptions about the common effects of demographic and cancer treatment information on the co-pathway outcomes into the model requires a hierarchical formulation of the regression parameter distributions, an approach that is exclusive to the Bayesian philosophy.
+Third, our desire to incorporate assumptions about the common effects of demographic and cancer treatment information on the co-pathway outcomes into the model requires a hierarchical formulation of the regression parameter distributions, an approach that is exclusive to the Bayesian philosophy.
 
 ## Simulation Study
 
@@ -146,7 +146,7 @@ $$
 \log\begin{bmatrix}Y\\Z\end{bmatrix}|x\sim\mathrm{N}_2\left(\begin{bmatrix}\beta_Y^\prime\\ \beta_Z^\prime\end{bmatrix}x,\text{diag}(\sigma^2_Y,\sigma^2_Z)\right)
 $$
 
-which is equivalent to two independent linear regressions of $Y$ and $Z$ on $x$.
+which is equivalent to two independent linear regressions of the latent outcomes $\log(Y)$ and $\log(Z)$ on $x$.
 
 For each simulation, we sample $n=600$ realizations of the $p=10$-vector $x_i\overset{iid}{\sim}\mathrm{N}_p(\vec 0_p,v_0I_p)|_{i=1,\cdots,n}$. Denote the full data covariates $X\in\mathbb{R}^{n\times p}$. Fix $\beta=(\beta_j)^\prime_{j=1,\cdots,p}$ where $\beta_j=(-1)^{\mathbb{I}(j\leq p/2)}$. We draw assignments $\beta_Y,\beta_Z\overset{iid}{\sim}\mathrm{N}_p(\beta,\Sigma_\beta)$. Latent log-event times $(\log Y, \log Z)_i^\prime$ are jointly drawn from $\mathrm{N}_2(5+x_i^\prime\begin{bmatrix}\beta_Y,\beta_Z\end{bmatrix}, \Sigma_{YZ})$. Observed lower event-time interval bounds are $y^L_i=\min\{100\lfloor Y_i/100\rfloor,500\}$, and upper bounds are $y^R_i=\min\{a\in\{100,200,300,400,500,2000\}|a\geq\min\{Y,2000\}\}$. $z^L_i$ and $z^R_i$ are assigned symmetrically. The resulting observed data used by the examined methods per-simulation is $(X,y^L_i,y^R_i,z^L_i,z^R_i)$.
 
@@ -158,6 +158,14 @@ We perform 50 simulation replications under parameters $v_o=1$, $\Sigma_\beta=I_
 
 # 8. Innovation or Extension
 
-## Joint Hierarchical Regression Structure
+Our innovations can be found in our implementation of a hierarchical regression model and modeling of the latent disease-driven co-pathway outcomes after controlling for covariates. These decisions arise from our assumed relationship between $Y$ and $Z$ in terms of their relationships with $X$ and further correlation after controlling for $X$.
+
+## Hierarchical Regression
+
+We impose a hierarchical structure on the regression parameter vectors to perform partial regularization towards the mean covariate effect, and to share information between the outcomes in quantifying the effects of $X$. To our knowledge, this particular application of hierarchical modeling has not been considered as a widespread procedure for sharing information between outcomes and is novel in our setting.
+
+## Latent Disease-Driven Co-pathway Outcomes
+
+Although demographic- and treatment-related information is captured in the regression on $X$, we posit that the disease information is not. Further, we assume that the latent disease information jointly drives $Y$ and $Z$. In lieu of observable features to jointly regress upon, we instead assume that there exists a partial correlation structure between $Y$ and $Z$ given $X$. Our choice of bivariate lognormal conditional distribution for the $Y,Z$ pair naturally facilitates modeling the partial covariance between $Y,Z|X$.
 
 # References
