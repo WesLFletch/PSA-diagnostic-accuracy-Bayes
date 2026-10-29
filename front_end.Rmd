@@ -122,7 +122,137 @@ DOCUMENT THE POSTERIOR DIAGNOSTICS HERE, LIKE ACTUALLY DO IT IN SOFTWARE.
 
 ## Alternative Model
 
-Peyton, please define your model, specify/justify choices of priors, and perform the computation / diagnostics / results here.
+### Model: Hierarchical Gamma Model around a Common Latent Progression Time
+
+To assess whether our conclusions depend on the log-normal assumption and on the form of the dependence between outcomes, we fit an alternative model that is built around a common latent progression time. With $Y$, $Z$, and $X$ defined as in Section 2, let $T$ be a subject-level latent progression event time. We posit
+
+$$
+  \begin{aligned}
+T\mid X,\beta,\alpha_T&\sim\mathrm{Gamma}\left(\alpha_T,\ \alpha_T e^{-X^\prime\beta}\right), \\
+Y\mid T,\alpha_Y&\sim\mathrm{Gamma}\left(\alpha_Y,\ \alpha_Y/T\right), \\
+Z\mid T,\delta,\alpha_Z&\sim\mathrm{Gamma}\left(\alpha_Z,\ \alpha_Z/(e^{\delta}T)\right),
+\end{aligned}
+$$
+  
+  where the gamma distributions are parameterized by shape and rate, and $Y$ and $Z$ are conditionally independent given $T$. Under this specification
+
+$$
+  \mathbb{E}[T\mid X]=e^{X^\prime\beta},
+\qquad
+\mathbb{E}[Y\mid T]=T,
+\qquad
+\mathbb{E}[Z\mid T]=e^{\delta}T,
+$$
+  
+  so the latent progression time $T$ carries all of the covariate information, and the PSA and PCa progression times scatter around it. Equivalently, on the log scale,
+
+$$
+  \log Y=X^\prime\beta+\log\varepsilon_T+\log\varepsilon_Y,
+\qquad
+\log Z=X^\prime\beta+\delta+\log\varepsilon_T+\log\varepsilon_Z,
+$$
+  
+  with independent $\varepsilon_A\sim\mathrm{Gamma}(\alpha_A,\alpha_A)$ for $A\in\{T,Y,Z\}$.
+
+This formulation imposes the conditional dependence between $Y$ and $Z$ given $X$ directly, through the shared latent time, rather than through a covariance parameter. It represents the latent health and disease progression motivated in Section 2 as an explicit event time: a subject whose underlying disease progresses late tends to show late PSA progression and late PCa progression. The implied covariance of the log event times given $X$ is
+
+$$
+  \mathrm{Cov}\left(\begin{bmatrix}\log Y\\\log Z\end{bmatrix}\Big|X\right)=
+  \begin{bmatrix}
+\psi_1(\alpha_T)+\psi_1(\alpha_Y) & \psi_1(\alpha_T) \\
+\psi_1(\alpha_T) & \psi_1(\alpha_T)+\psi_1(\alpha_Z)
+\end{bmatrix},
+$$
+  
+  where $\psi_1$ is the trigamma function, so that $\mathrm{Var}(\log\varepsilon_A)=\psi_1(\alpha_A)$. The co-pathway correlation
+
+$$
+  \rho=\frac{\psi_1(\alpha_T)}{\sqrt{\left(\psi_1(\alpha_T)+\psi_1(\alpha_Y)\right)\left(\psi_1(\alpha_T)+\psi_1(\alpha_Z)\right)}}
+$$
+  
+  is the correlation of the log event times, the same quantity as $\rho=\sigma_{YZ}/(\sigma_Y\sigma_Z)$ in the primary model, so the two can be compared directly. It is large when variation in the latent progression time dominates the outcome-specific scatter around it, and it is restricted to $(0,1)$. A non-negative association is clinically reasonable, since a common disease process should delay or accelerate both types of progression together. It can be checked against the posterior of $\rho$ under the primary model, which is unrestricted.
+
+#### Shared covariate effects
+
+Because covariates enter only through $T$, the alternative model replaces the primary model's hierarchical prior $\beta_Y,\beta_Z\mid\beta,\Sigma_\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta)$ with a single coefficient vector $\beta$. Each covariate therefore has the same multiplicative effect on PSA and PCa progression: $\exp(\beta_j)$ is the time ratio associated with a unit change in $X_j$ for $T$, $Y$, and $Z$ alike. The primary model's hierarchical prior was motivated by the expectation that both outcomes are roughly symmetrically affected by the treatment and demographic covariates. The alternative model makes that expectation exact, and it plays the role of the limiting case $\Sigma_\beta\to0$, apart from the outcome-specific offset $\delta$.
+
+This is a stronger conditional distribution assumption on $Y,Z\mid X$, and it is the main way the alternative model departs from the primary one. It removes $p$ regression parameters and the hierarchical variance parameters. The cost is that a covariate acting on one outcome more than the other cannot be represented. For example, anti-androgen therapy acts directly on PSA production, and bisphosphonates act on bone, where radiographic metastases are commonly detected. If such effects were substantial, the shared $\beta$ would average them across the two outcomes. We assess this by comparing the alternative model's $\beta$ with the primary model's posteriors for $\beta_Y$ and $\beta_Z$.
+
+NEED comparison of $\beta$ with the primary model's $\beta_Y$ and $\beta_Z$
+
+#### Offset between outcomes
+
+The parameter $\delta$ allows PCa progression to occur systematically later (or earlier) than PSA progression for a given latent progression time, with $e^{\delta}=\mathbb{E}[Z\mid T]/\mathbb{E}[Y\mid T]$. Without it, the model would force both outcomes to occur at the same time on average, which is implausible given that rising PSA typically precedes radiographic evidence of progression. Only one offset is identifiable alongside the intercept in $\beta$, so $Y$ is centered on $T$ and the offset is placed on $Z$.
+
+#### Choice of the gamma distribution
+
+The gamma distribution shares the two properties used to motivate the log-normal likelihood in Section 2: strictly positive support, and variance that increases with the location, here with a constant coefficient of variation $\alpha_A^{-1/2}$. Both models are accelerated failure time models, in which covariates act multiplicatively on the event time, so covariate effects are on the same time-ratio scale. The intercepts are not directly comparable, since $\mathbb{E}[\log Y\mid X]=X^\prime\beta+\sum_{A\in\{T,Y\}}\left(\psi(\alpha_A)-\log\alpha_A\right)$ under this model, where $\psi$ is the digamma function.
+
+The gamma and log-normal distributions differ in hazard shape and tails. The log-normal hazard is non-monotone: it rises to a peak and then declines, with a heavy right tail. The gamma hazard at each level of the model is monotone: increasing for $\alpha_A>1$, decreasing for $\alpha_A<1$, and constant (exponential) for $\alpha_A=1$. The log-gamma errors are also left-skewed on the log-time scale, which places relatively more mass on early event times than symmetric normal errors. Marginally over $T$, each observed event time is a product of two independent gamma variables rather than a gamma variable. Because the one-year progression status of subjects with incomplete follow-up is recovered from the model, a different shape over the first 365 days is precisely the kind of assumption that could alter the estimated confusion matrix. Agreement between the two models would indicate that the diagnostic accuracy conclusions are robust to both the choice of event-time distribution and the form of the dependence between outcomes.
+
+### Conditional Data Likelihood
+
+The observed data $(x,y^L,y^R,z^L,z^R)_i$, $i=1,\cdots,n$, are as in Section 2. Because $Y$ and $Z$ are conditionally independent given $T$, the likelihood factorizes given the latent progression times $t=(t_1,\cdots,t_n)$:
+  
+  $$
+  \begin{aligned}
+&p((y^L_i,y^R_i,z^L_i,z^R_i)_{i=1,\cdots,n}\mid t,\delta,\alpha_Y,\alpha_Z) \\
+&\qquad=\prod_{i=1}^n\Big\lbrack F_Y(y^R_i\mid t_i)-F_Y(y^L_i\mid t_i)\Big\rbrack\Big\lbrack F_Z(z^R_i\mid t_i)-F_Z(z^L_i\mid t_i)\Big\rbrack,
+\end{aligned}
+$$
+  
+  where $F_Y(\cdot\mid t_i)$ is the gamma CDF with shape $\alpha_Y$ and rate $\alpha_Y/t_i$, $F_Z(\cdot\mid t_i)$ is the gamma CDF with shape $\alpha_Z$ and rate $\alpha_Z/(e^{\delta}t_i)$, and $F_A(0\mid t_i)=0$. The marginal likelihood integrates each subject's term over $t_i\sim\mathrm{Gamma}(\alpha_T,\alpha_T e^{-x_i^\prime\beta})$. In place of the bivariate normal CDF of the primary model, the dependence between outcomes enters through the shared $t_i$.
+
+### Analysis Outcome Measures
+
+The outcome measures are unchanged from Section 2. For each posterior draw of $(\beta,\delta,\alpha_T,\alpha_Y,\alpha_Z)$, a posterior predictive pair for a subject with covariates $X^*$ is generated by drawing $T^*\sim\mathrm{Gamma}(\alpha_T,\alpha_T e^{-X^{*\prime}\beta})$, and then $Y^*\mid T^*$ and $Z^*\mid T^*$ independently from their gamma distributions. The confusion matrix of Section 2 is estimated at the one-year horizon $t=365$, from which
+
+$$
+\begin{aligned}
+\text{sensitivity}&=\mathbb{P}(Y^*<t\mid Z^*<t,X^*,Y,X), \\
+\text{specificity}&=\mathbb{P}(Y^*>t\mid Z^*>t,X^*,Y,X).
+\end{aligned}
+$$
+
+As in the primary model, the posterior distribution of $\rho$ is examined as a heuristic to support the contingency table analysis.
+
+### Prior Distributions
+
+With a single coefficient vector, no hierarchical prior is needed. We use the same non-informative prior as the primary model's global coefficients,
+
+$$
+  \beta_j\overset{iid}{\sim}\mathrm{N}(m_0,v_0),\quad j=1,\cdots,p,
+\qquad
+\delta\sim\mathrm{N}(0,v_0),
+$$
+  
+  with $m_0=0$ and $v_0=1000$. The Wishart prior on $\Sigma_{YZ}$ is replaced by priors on the three gamma shapes, which together determine the log-time covariance:
+  
+  $$
+  \alpha_T,\alpha_Y,\alpha_Z\overset{iid}{\sim}\mathrm{Gamma}(s_0,r_0),\qquad s_0=2,\ r_0=1.
+$$
+  
+  This prior has its mode at $\alpha_A=1$ (the exponential model), mean 2, and central 95% interval $(0.24,5.57)$. It covers decreasing, constant, and increasing hazards, and coefficients of variation between roughly 0.42 and 2.03, without favoring either hazard direction.
+
+### Posterior Computation and Diagnostics
+
+The joint posterior, including the latent progression times $t$, is defined up to a normalizing constant by
+
+$$
+  \begin{aligned}
+&\pi(\beta,\delta,\alpha_T,\alpha_Y,\alpha_Z,t\mid y^L_i,y^R_i,z^L_i,z^R_i) \\
+\propto&\prod_{i=1}^n\Big\lbrack F_Y(y^R_i\mid t_i)-F_Y(y^L_i\mid t_i)\Big\rbrack\Big\lbrack F_Z(z^R_i\mid t_i)-F_Z(z^L_i\mid t_i)\Big\rbrack \\
+&\times\prod_{i=1}^n\frac{(\alpha_T e^{-x_i^\prime\beta})^{\alpha_T}}{\Gamma(\alpha_T)}t_i^{\alpha_T-1}\exp\left\{-\alpha_T e^{-x_i^\prime\beta}t_i\right\} \\
+&\times\exp\left\{-\dfrac{1}{2v_0}\left\lbrack(\beta-m_01_p)^\prime(\beta-m_01_p)+\delta^2\right\rbrack\right\} \\
+&\times(\alpha_T\alpha_Y\alpha_Z)^{s_0-1}\exp\{-r_0(\alpha_T+\alpha_Y+\alpha_Z)\}.
+\end{aligned}
+$$
+  
+  As with the primary model, we sample from the posterior using `rjags`, with the interval-censored event times and the latent progression times treated as latent variables, and the event times constrained to their observed intervals. For comparability, the alternative model uses the same data handling as Section 4: upper bounds are set to the minimum of the factual upper bound and 2000, and lower bounds to the minimum of the factual lower bound and 1000. The MCMC settings also match the primary model: 4 chains, each with 1000 burn-in iterations and 2500 retained draws at a thinning rate of 4, for 10,000 posterior draws in total. Posterior draws of $\rho$ and of the log-time covariance matrix are computed from the draws of $\alpha_T$, $\alpha_Y$, and $\alpha_Z$.
+
+The three shape parameters are separated only through how the two outcomes vary jointly around the latent progression time, so they may mix more slowly than $\beta$ and $\delta$. We therefore examine their diagnostics first, and lengthen the chains if they do not meet the convergence criterion.
+
+Convergence is assessed with the same `posterior_diagnostics()` function used for the primary model. It produces trace plots and autocorrelation plots for each parameter, the Gelman–Rubin potential scale reduction factor $\hat R$ (target $\hat R<1.1$), the effective sample size, and the Monte Carlo standard error.
 
 ## Model Comparisons
 
