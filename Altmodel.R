@@ -1,45 +1,38 @@
 library("rjags")
 library("tidyverse")
 library("PipeHelpR") # devtools::install_github("WesLFletch/PipeHelpR")
-
 ################################################################################
-# 7. Alternative Model: Latent Hierarchical Joint Gamma Regression
-#    with a shared latent disease-progression effect
+# 7. Alternative Model: Hierarchical Gamma Model around a Common Latent
+#    Progression Time
 #
-# Y, Z are the latent PSA and PCa progression times, X the p-vector of treatment
-# and demographic variables, and W_i a subject-level latent disease-progression
-# effect shared by both outcomes:
+# Y, Z are the latent PSA and PCa progression times and X the p-vector of
+# treatment and demographic variables. Each subject has a common latent
+# progression time T, the only place covariates enter, and Y, Z scatter around it:
 #
-#   Y | X, W ~ Gamma(alpha_Y, alpha_Y / exp(X'beta_Y + W))    E[Y | X, W] = exp(X'beta_Y + W)
-#   Z | X, W ~ Gamma(alpha_Z, alpha_Z / exp(X'beta_Z + W))    E[Z | X, W] = exp(X'beta_Z + W)
-#   W ~ N(0, sigma_W^2),   Y and Z conditionally independent given W
+#   T | X     ~ Gamma(alpha_T, alpha_T / exp(X'beta))        E[T | X] = exp(X'beta)
+#   Y | T     ~ Gamma(alpha_Y, alpha_Y / T)                   E[Y | T] = T
+#   Z | T     ~ Gamma(alpha_Z, alpha_Z / (exp(delta) T))      E[Z | T] = exp(delta) T
+#   Y and Z conditionally independent given T
 #
-# Equivalently log A = X'beta_A + W + log(e_A), e_A ~ Gamma(alpha_A, alpha_A).
-# The primary model can be written the same way with normal errors in place of
-# log(e_A), so the only change is the subject-level error distribution.
-# The implied covariance of (log Y, log Z) given X is
+# delta is the average log-time offset of PCa progression relative to PSA
+# progression (Y is centered on T, so only one offset is identifiable).
+# Covariate effects are shared: exp(beta_j) is the time ratio for both outcomes.
+# This replaces the primary model's hierarchical prior on (beta_Y, beta_Z).
 #
-#   [ sigma_W^2 + trigamma(alpha_Y)    sigma_W^2                     ]
-#   [ sigma_W^2                        sigma_W^2 + trigamma(alpha_Z) ]
+# Implied covariance of (log Y, log Z) given X, comparable with Sigma_YZ:
+#   [ trigamma(alpha_T) + trigamma(alpha_Y)    trigamma(alpha_T)                     ]
+#   [ trigamma(alpha_T)                        trigamma(alpha_T) + trigamma(alpha_Z) ]
 #
-# returned as Sigmayz, directly comparable with the primary model's Sigma_YZ.
+# Priors:
+#   beta_j iid N(m0, v0)                     m0 = 0, v0 = 1000
+#   delta ~ N(0, v0)
+#   alpha_T, alpha_Y, alpha_Z iid Gamma(s0, r0)   s0 = 2, r0 = 1
 #
-# Priors (hyperparameters match Section 3):
-#   beta_Y, beta_Z | beta, Sigma_beta  iid N(beta, Sigma_beta),  Sigma_beta = diag(1 / tausqbeta_j)
-#   tausqbeta_j iid Gamma(a0, b0)    a0 = 2,  b0 = 1
-#   beta_j      iid N(m0, v0)        m0 = 0,  v0 = 1000
-#   alpha_Y, alpha_Z iid Gamma(s0, r0)   s0 = 2, r0 = 1   (mode 1 = exponential; 95% (0.24, 5.6))
-#   sigma_W ~ Uniform(0, 5)
-#
-# Fitted with rjags; gamma_model() mirrors lognorm_model() (same arguments and
-# return format: betayz p by 2 by M, Sigmayz 2 by 2 by M).
+# Fitted with rjags; gamma_model() follows lognorm_model()'s arguments and style.
 ################################################################################
-
-
 # ==============================================================================
 # Data
 # ==============================================================================
-
 progression = do(f=\(){
   subdir = "D4320C00015 De-Identified RDB Data"
   vsit = haven::read_sas(paste(getwd(), subdir, "r_visit.sas7bdat",  sep="/"))
@@ -145,23 +138,16 @@ boundsyz = array(
   dim = c(nrow(x), 2, 2),
   dimnames = list(model_dat$SUBJ, c("y", "z"), c("lower", "upper"))
 )
-
-
-
-
 # ==============================================================================
 # Model functions
 # ==============================================================================
-
-# gamma data-to-posterior model pipeline
+# gamma common-latent-time data-to-posterior model pipeline
 gamma_model = function(boundsyz,      # n by 2 (y vs z) by 2 (lower vs upper bound) array
                        x,             # n by p design matrix (first column intercept)
-                       m0 = 0,        # mean of global beta vector entries
-                       v0 = 1e+3,     # variance of global beta vector entries
-                       a0 = 2,        # shape parameter of betaYZ precision matrix diagonal
-                       b0 = 1,        # rate parameter of betaYZ precision matrix diagonal
-                       s0 = 2,        # shape parameter of alphaYZ gamma prior
-                       r0 = 1,        # rate parameter of alphaYZ gamma prior
+                       m0 = 0,        # mean of beta vector entries
+                       v0 = 1e+3,     # variance of beta vector entries and delta
+                       s0 = 2,        # shape parameter of alpha gamma priors
+                       r0 = 1,        # rate parameter of alpha gamma priors
                        M = 1e+4,      # number of posterior draws after burn-in
                        burnin = 1e+4, # number of burn-in draws
                        thin = 1,      # post burn-in thinning interval
@@ -173,20 +159,18 @@ gamma_model = function(boundsyz,      # n by 2 (y vs z) by 2 (lower vs upper bou
     for (i in 1:n) {
       # observations are interval-censored
       for (j in 1:2) { Iyz[i,j] ~ dinterval(yz[i,j], boundsyz[i,j,1:2]) }
-      for (j in 1:2) { yz[i,j] ~ dgamma(alphayz[j], rateyz[i,j]) }          # gamma responses
-      for (j in 1:2) { rateyz[i,j] = alphayz[j]/exp(muyz[i,j]) }            # so E[yz] = exp(muyz)
-      for (j in 1:2) { muyz[i,j] = inprod(x[i,1:p], betayz[1:p,j]) + w[i] } # linear predictor
-      w[i] ~ dnorm(0, tauw)                                                 # shared latent progression
+      # Y and Z scatter around the common latent progression time t
+      yz[i,1] ~ dgamma(alphay, alphay/t[i])              # E[Y | t] = t
+      yz[i,2] ~ dgamma(alphaz, alphaz/(exp(delta)*t[i])) # E[Z | t] = exp(delta) t
+      # common latent progression time, the only place covariates enter
+      t[i] ~ dgamma(alphat, alphat/exp(inprod(x[i,1:p], beta[1:p])))
     }
-    # hierarchical beta coefficients
-    for (j in 1:p) { for (k in 1:2) { betayz[j,k] ~ dnorm(beta[j], tausqbeta[j]) } }
     # priors
-    beta ~ dmnorm(mubeta[1:p], diagbeta[1:p,1:p])
-    for (j in 1:p) { mubeta[j] = m0 }
-    for (j in 1:p) { tausqbeta[j] ~ dgamma(a0, b0) } # gamma prior on precision
-    for (j in 1:2) { alphayz[j] ~ dgamma(s0, r0) }   # gamma shapes
-    sigmaw ~ dunif(0, 5)                             # sd of shared latent effect
-    tauw = 1/pow(sigmaw, 2)
+    for (j in 1:p) { beta[j] ~ dnorm(m0, 1/v0) }
+    delta ~ dnorm(0, 1/v0)
+    alphat ~ dgamma(s0, r0)
+    alphay ~ dgamma(s0, r0)
+    alphaz ~ dgamma(s0, r0)
   }
   "
   n = nrow(x)
@@ -198,18 +182,19 @@ gamma_model = function(boundsyz,      # n by 2 (y vs z) by 2 (lower vs upper bou
     n = n,
     p = p,
     m0 = m0,
-    diagbeta = diag(p)/v0,
-    a0 = a0,
-    b0 = b0,
+    v0 = v0,
     s0 = s0,
     r0 = r0
   )
   yz_init = apply(boundsyz, 1:2, mean) # latent times start inside their intervals
   initslist = list(
     yz = yz_init,
-    betayz = rbind(log(colMeans(yz_init)), matrix(0, nrow=p-1, ncol=2)),
-    alphayz = c(1, 1),
-    sigmaw = 0.5,
+    t = yz_init[,1],
+    beta = c(log(mean(yz_init[,1])), rep(0, p-1)),
+    delta = log(mean(yz_init[,2])/mean(yz_init[,1])),
+    alphat = 1,
+    alphay = 1,
+    alphaz = 1,
     .RNG.name = "base::Mersenne-Twister",
     .RNG.seed = seed
   )
@@ -217,60 +202,44 @@ gamma_model = function(boundsyz,      # n by 2 (y vs z) by 2 (lower vs upper bou
   update(out_model, n.iter=burnin)
   posterior = coda.samples(
     out_model,
-    variable.names=c("betayz", "alphayz", "sigmaw"),
+    variable.names=c("beta", "delta", "alphat", "alphay", "alphaz"),
     n.iter=M*thin,
     thin=thin
   )
-  betayz = posterior[[1]] %>%
-    as_tibble() %>%
-    select(starts_with("betayz")) %>%
-    mutate(draw = row_number(), .before=everything()) %>%
-    pivot_longer(-draw, names_to="var_name", values_to="value") %>%
-    mutate(
-      j = as.numeric(str_extract_all(var_name, "\\d+") %>% sapply(\(v)v[1])),
-      k = as.numeric(str_extract_all(var_name, "\\d+") %>% sapply(\(v)v[2])),
-      .before=everything(),
-      .keep="unused"
-    ) %>%
-    xtabs(value~j+k+draw, data=.)
-  alphayz = posterior[[1]][, c("alphayz[1]", "alphayz[2]")] %>% as.matrix() %>% t() # 2 by M
-  sigmaw = as.vector(posterior[[1]][, "sigmaw"])                                    # length M
-  M_out = length(sigmaw)
+  draws = as.matrix(posterior[[1]])
+  alphas = draws[, c("alphat", "alphay", "alphaz")] %>% t() # 3 by M
+  M_out = nrow(draws)
   # implied covariance of (log Y, log Z) given X, comparable with lognorm_model's Sigmayz
   Sigmayz = sapply(1:M_out, \(m){
-    sigmaw[m]^2 + diag(trigamma(alphayz[,m]))
+    trigamma(alphas["alphat", m]) + diag(trigamma(alphas[c("alphay", "alphaz"), m]))
   }) %>%
     array(c(2, 2, M_out))
   list(
-    betayz = betayz,   # p by 2 by M array
-    alphayz = alphayz, # 2 by M array of gamma shapes
-    sigmaw = sigmaw,   # length M vector, sd of shared latent effect
-    Sigmayz = Sigmayz  # 2 by 2 by M array
+    beta = draws[, paste0("beta[", 1:p, "]"), drop=FALSE] %>% t(), # p by M array
+    delta = draws[, "delta"],                                      # length M vector
+    alphas = alphas,                                               # 3 by M (T, Y, Z shapes)
+    Sigmayz = Sigmayz                                              # 2 by 2 by M array
   )
 }
 
 # sample from gamma model posterior predictive distribution to get M by n by 2 array
-gamma_sample_ppd = function(x,             # n by p design matrix
-                            betayz_draws,  # p by 2 by M array
-                            alphayz_draws, # 2 by M array
-                            sigmaw_draws   # length M vector
+gamma_sample_ppd = function(x,           # n by p design matrix
+                            beta_draws,  # p by M array
+                            delta_draws, # length M vector
+                            alpha_draws  # 3 by M array (T, Y, Z shapes)
 ) {
   n = nrow(x)
-  M = dim(betayz_draws)[3]
+  M = ncol(beta_draws)
   arrapply(1:M, f=\(m){
-    betayz = betayz_draws[,,m]
-    alphayz = alphayz_draws[,m]
-    w = rnorm(n, 0, sigmaw_draws[m]) # shared latent progression for each subject
-    muyz = x%*%betayz + w
-    sapply(1:2, \(k)rgamma(n, alphayz[k], alphayz[k]/exp(muyz[,k])))
+    a = alpha_draws[,m]
+    t = rgamma(n, a[1], a[1]/exp(drop(x%*%beta_draws[,m]))) # common latent progression time
+    cbind(rgamma(n, a[2], a[2]/t),                          # PSA progression
+          rgamma(n, a[3], a[3]/(exp(delta_draws[m])*t)))    # PCa progression
   })
 }
-
-
 # ==============================================================================
 # Fit, diagnostics, and outcome measures
 # ==============================================================================
-
 # 4 chains, settings as described in Section 4 of the report
 # (set these to whatever the lognormal model's final run uses)
 gamma_fits = lapply(1:4, \(ch){
@@ -285,11 +254,11 @@ rho_draws = \(fit)fit$Sigmayz[1,2,]/sqrt(fit$Sigmayz[1,1,]*fit$Sigmayz[2,2,])
 p = ncol(x)
 gamma_params = c(
   list(rho = rho_draws,
-       sigmaw = \(fit)fit$sigmaw,
-       alphaY = \(fit)fit$alphayz[1,],
-       alphaZ = \(fit)fit$alphayz[2,]),
-  lapply(1:p, \(j)\(fit)as.vector(fit$betayz[j,1,])) %>% setNames(paste0("betaY[", colnames(x), "]")),
-  lapply(1:p, \(j)\(fit)as.vector(fit$betayz[j,2,])) %>% setNames(paste0("betaZ[", colnames(x), "]"))
+       delta = \(fit)fit$delta,
+       alphaT = \(fit)fit$alphas[1,],
+       alphaY = \(fit)fit$alphas[2,],
+       alphaZ = \(fit)fit$alphas[3,]),
+  lapply(1:p, \(j)\(fit)fit$beta[j,]) %>% setNames(paste0("beta[", colnames(x), "]"))
 )
 gamma_diagnostics = lapply(gamma_params, \(f){
   do.call(posterior_diagnostics, c(lapply(gamma_fits, f), list(lag_max = 50)))
@@ -306,14 +275,13 @@ sapply(gamma_params, \(f){
 }) %>% t()
 
 # pool chains
-n_draws = sum(sapply(gamma_fits, \(fit)length(fit$sigmaw)))
 gamma_draws = list(
-  betayz  = array(unlist(lapply(gamma_fits, \(fit)as.vector(fit$betayz))), c(p, 2, n_draws)),
-  alphayz = do.call(cbind, lapply(gamma_fits, \(fit)fit$alphayz)),
-  sigmaw  = unlist(lapply(gamma_fits, \(fit)fit$sigmaw))
+  beta   = do.call(cbind, lapply(gamma_fits, \(fit)fit$beta)),
+  delta  = unlist(lapply(gamma_fits, \(fit)fit$delta)),
+  alphas = do.call(cbind, lapply(gamma_fits, \(fit)fit$alphas))
 )
 
 # outcome measures at the one-year horizon
-ppd_gamma = gamma_sample_ppd(x, gamma_draws$betayz, gamma_draws$alphayz, gamma_draws$sigmaw)
+ppd_gamma = gamma_sample_ppd(x, gamma_draws$beta, gamma_draws$delta, gamma_draws$alphas)
 cm_gamma  = confusion_matrix(ppd_gamma, t_horizon = 365)
 cal_gamma = calib_interval(ppd_gamma, boundsyz)
