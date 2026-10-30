@@ -1,4 +1,5 @@
 library("rjags")
+library("survival")
 library("tidyverse")
 library("PipeHelpR") # devtools::install_github("WesLFletch/PipeHelpR")
 
@@ -332,8 +333,7 @@ sim_study = function(repl = 50, # number of simulation replications
     logn_event_times = lognorm_model(data$boundsyz, cbind(1, data$x)) %>%
       do(\(post)lognorm_sample_ppd(cbind(1, data$x), post$betayz, post$Sigmayz)) %>%
       apply(2:3, \(v)exp(mean(log(v))))
-    gamma_event_times = matrix(NA, nrow=nrow(data$x), ncol=2) # TODO: IMPLEMENT LATER.
-    arrapply(list(freq_event_times, logn_event_times, gamma_event_times), f=\(est_event_times){
+    arrapply(list(freq_event_times, logn_event_times), f=\(est_event_times){
       apply(log(est_event_times)-log(true_event_times), 2, \(v)sqrt(mean(v^2)))
     })
   }
@@ -341,7 +341,7 @@ sim_study = function(repl = 50, # number of simulation replications
   arrapply(1:repl, f=\(m)one_sim(...)) %>%
     setDimnames(
       as.character(1:repl),
-      c("Frequentist LogNormal", "Bayes LogNormal", "Bayes LogGamma"),
+      c("Frequentist LogNormal", "Bayes LogNormal"),
       c("Y", "Z")
     )
 }
