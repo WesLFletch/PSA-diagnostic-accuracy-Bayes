@@ -28,7 +28,7 @@ If a progression event occurs, then it is only known to have occurred between th
 Define $Y$ and $Z$ to be the respective latent times of PSA and PCa progression, and $X$ as the $p$-vector of treatment and demographic variables. We posit that
 
 $$
-\log\begin{bmatrix}Y\\Z\end{bmatrix}|X,\beta_Y,\beta_Z,\Sigma_{YZ}\sim\mathrm{N}\left(\mu_{YZ},\Sigma_{YZ}\right)
+\log\begin{bmatrix}Y\\Z\end{bmatrix}\mid X,\beta_Y,\beta_Z,\Sigma_{YZ}\sim\mathrm{N}\left(\mu_{YZ},\Sigma_{YZ}\right)
 $$
 
 where
@@ -46,7 +46,7 @@ $$
 and
 
 $$
-\beta_Y,\beta_Z|\beta,\Sigma_\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta).
+\beta_Y,\beta_Z\mid \beta,\Sigma_\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta).
 $$
 
 We assume that all subjects are independent, but impose no such assumption on each individual's joint distribution of responses $Y,Z$ so that the latent health/disease progression can jointly drive the PSA and PCa progression event times, quantified by the covariance parameter $\sigma_{YZ}$. The joint hierarchical specification of $\beta_Y,\beta_Z$ is motivated by the knowledge that both PSA and PCa progression should be roughly symmetrically affected by the treatment and demographic covariates, encouraging an informative, near-zero concentrated prior on the entries of $\Sigma_\beta$.
@@ -57,7 +57,7 @@ For $i=1,\cdots,n$ independent subjects, we observe data $(x,y^L,y^R,z^L,z^R)_i$
 
 $$
 \begin{aligned}
-p((y^L_i,y^R_i,z^L_i,z^R_i)_{i=1,\cdots,n}|X,\beta_Y,\beta_Z,\Sigma_{YZ})&=\prod_{i=1}^n\mathbb{P}\left(y^L_i<Y<y^R_i,z^L_i<Z<z^R_i|X=x_i\right) \\
+p((y^L_i,y^R_i,z^L_i,z^R_i)_{i=1,\cdots,n}\mid X,\beta_Y,\beta_Z,\Sigma_{YZ})&=\prod_{i=1}^n\mathbb{P}\left(y^L_i<Y<y^R_i,z^L_i<Z<z^R_i|X=x_i\right) \\
 &=\prod_{i=1}^n\int_{\log y^L_i}^{\log y^R_i}\int_{\log z^L_i}^{\log z^R_i}\phi(s_Y(u),s_Z(v);\rho)\,dv\,du \\
 &=\prod_{i=1}^n\Big\lbrack\Phi(s_Y(\log y^R_i),s_Z(\log z^R_i);\rho)-\Phi(s_Y(\log y^R_i),s_Z(\log z^L_i);\rho) \\
 &\qquad{}-\Phi(s_Y(\log y^L_i),s_Z(\log z^R_i);\rho)+\Phi(s_Y(\log y^L_i),s_Z(\log z^L_i);\rho)\Big\rbrack \\
@@ -70,33 +70,33 @@ where $s_A(a)=(a-x_i^\prime\beta_A)/\sigma_A$ standardizes its argument, $\rho=\
 
 Given posterior draws for $\beta_Y,\sigma^2_Y,\beta_Z,\sigma^2_Z$, the posterior predictive distributions $Y^*|X^*,Y,X$ and $Z^*|X^*,Z,X$ can be estimated for an individual with treatment/demographics $X^*$. The confusion matrix
 
-|                    |                                    |                                    |
-|-------------------:|-----------------------------------:|-----------------------------------:|
-|                    |                 No PSA Progression |                    PSA Progression |
-| No PCa Progression | $=\mathbb{P}(Y^*>t,Z^*>t|X^*,Y,X)$ | $=\mathbb{P}(Y^*<t,Z^*>t|X^*,Y,X)$ |
-|    PCa Progression | $=\mathbb{P}(Y^*>t,Z^*<t|X^*,Y,X)$ | $=\mathbb{P}(Y^*<t,Z^*<t|X^*,Y,X)$ |
-|                    |                                    |                                    |
+|                    |                                        |                                        |
+|-------------------:|---------------------------------------:|---------------------------------------:|
+|                    |                     No PSA Progression |                        PSA Progression |
+| No PCa Progression | $=\mathbb{P}(Y^*>t,Z^*>t\mid X^*,Y,X)$ | $=\mathbb{P}(Y^*<t,Z^*>t\mid X^*,Y,X)$ |
+|    PCa Progression | $=\mathbb{P}(Y^*>t,Z^*<t\mid X^*,Y,X)$ | $=\mathbb{P}(Y^*<t,Z^*<t\mid X^*,Y,X)$ |
+|                    |                                        |                                        |
 
-can be used to assess the diagnostic accuracy of PSA in predicting PCa progression at various clinical horizons $t$ and subject treatments/demographics $X$. We focus on the one-year $(t=365)$ horizon and assess subjects of various treatment/demographics combinations.
+can be used to assess the diagnostic accuracy of PSA in predicting PCa progression at various clinical horizons $t$ and subject treatments/demographics $X$. It is also useful for computing sensitivity, specificity, and other related measures of diagnostic accuracy. We focus on the one-year $(t=365)$ horizon and assess subjects of various treatment/demographics combinations.
 
-The posterior distribution of $\rho=\sigma_{YZ}/(\sigma_Y\sigma_Z)$ quantifies the strength of the co-pathway relationship between PSA and PCa progression. We examine this posterior as a heuristic to support the contingency table analysis.
+The posterior distribution of $\rho=\sigma_{YZ}/(\sigma_Y\sigma_Z)$ quantifies the strength of the co-pathway relationship between PSA and PCa progression. We also examine this posterior as a heuristic to support the contingency table analysis.
 
 # 3. Prior Distributions
 
-Recall our hierarchical joint specification $\beta_Y,\beta_Z|\beta,\Sigma_\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta)$ for the relationship between subject covariates and the latent co-pathway outcomes $Y,Z$. To encourage closeness between $\beta_Y$ and $\beta_Z$ in parameter space, we use the conjugate prior $(\Sigma_\beta)_{j,j}^{-1}\overset{iid}{\sim}\mathrm{Gamma}(a_0,b_0)$ for $j=1,\cdots,p$ on the precision of each coefficient's difference from the corresponding entry in the latent vector $\beta$. The off-diagonal entries are set to 0 as a simplifying assumption. The conjugate $\beta_j\overset{iid}{\sim}\mathrm{N}(m_0, v_0)$, $j=1,\cdots,p$ prior is used for the latent co-pathway demographics-related progression drivers. We consider hyperparameter assignments $a_0=2$, $b_0=1$, $m_0=0$, and $v_0=1000$ as our defaults to encourage small $\Sigma_\beta$ (higher concentration of $\beta_Y,\beta_Z$ around the global $\beta$) and a non-informative $\beta$ prior.
+Recall our hierarchical joint specification $\beta_Y,\beta_Z\mid \beta,\Sigma_\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta)$ for the relationship between subject covariates and the latent co-pathway outcomes $Y,Z$. To encourage closeness between $\beta_Y$ and $\beta_Z$ in parameter space, we use the conjugate prior $(\Sigma_\beta)_{j,j}^{-1}\overset{iid}{\sim}\mathrm{Gamma}(a_0,b_0)$ for $j=1,\cdots,p$ on the precision of each coefficient's difference from the corresponding entry in the latent vector $\beta$. The off-diagonal entries are set to 0 as a simplifying assumption. The conjugate $\beta_j\overset{iid}{\sim}\mathrm{N}(m_0, v_0)$, $j=1,\cdots,p$ prior is used for the latent co-pathway demographics-related progression drivers. We consider hyperparameter assignments $a_0=2$, $b_0=1$, $m_0=0$, and $v_0=1000$ as our defaults to encourage small $\Sigma_\beta$ (higher concentration of $\beta_Y,\beta_Z$ around the global $\beta$) and a non-informative $\beta$ prior.
 
-To jointly model the latent time-to-event outcome covariance matrix $\Sigma_{YZ}$, we use the $(\Sigma_{YZ})^{-1}\sim\mathrm{Wishart}(d_0, W_0)$ conjugate prior on the precision matrix with general-use default hyperparameter assignments of $d_0=2$ and $W_0=I_2/2$, which is the least informative proper Wishart prior, and has expectation $I_2$.
+To jointly model the latent time-to-event outcome covariance matrix $\Sigma_{YZ}$, we use the $(\Sigma_{YZ})^{-1}\sim\mathrm{Wishart}(d_0, W_0)$ conjugate prior on the precision matrix with general-use default hyperparameter assignments of $d_0=2$ and $W_0=(I_2+1_21_2^\prime)/4$, which is the least informative proper Wishart prior, and has expectation $(I_2+1_21_2^\prime)/2$. The choice of an imposed partial correlation in the prior is clinically motivated by our assumption that latent disease drivers (which are not controlled for in $X$) jointly affect the co-pathway outcomes.
 
 The specific choices of default hyperparameters were chosen by a short simulation study conducted prior to the analysis of real data.
 
 # 4. Posterior Computation and Diagnostics
 
-The joint posterior is defined up to a normalizing constant below.
+The full conditional posterior is defined up to a normalizing constant below.
 
 $$
 \begin{aligned}
-&\pi(\beta_Y,\beta_Z,\beta,\Sigma_{YZ},\Sigma_\beta|y^L_i,y^R_i,z^L_i,z^R_i) \\
-\propto&p((y^L_i,y^R_i,z^L_i,z^R_i)_{i=1,\cdots,n}|X,\beta_Y,\beta_Z,\Sigma_{YZ})\times\pi(\beta_Y,\beta_Z|\beta,\Sigma_\beta)\times\pi(\beta)\times\pi(\Sigma_{YZ})\times\pi(\Sigma_\beta) \\
+&\pi(\beta_Y,\beta_Z,\beta,\Sigma_{YZ},\Sigma_\beta\mid y^L_i,y^R_i,z^L_i,z^R_i) \\
+\propto&p((y^L_i,y^R_i,z^L_i,z^R_i)_{i=1,\cdots,n}\mid X,\beta_Y,\beta_Z,\Sigma_{YZ})\times\pi(\beta_Y,\beta_Z\mid \beta,\Sigma_\beta)\times\pi(\beta)\times\pi(\Sigma_{YZ})\times\pi(\Sigma_\beta) \\
 \propto&\prod_{i=1}^n\Big\lbrack\Phi(s_Y(\log y^R_i),s_Z(\log z^R_i);\rho)-\Phi(s_Y(\log y^R_i),s_Z(\log z^L_i);\rho) \\
 &\qquad{}-\Phi(s_Y(\log y^L_i),s_Z(\log z^R_i);\rho)+\Phi(s_Y(\log y^L_i),s_Z(\log z^L_i);\rho)\Big\rbrack \\
 &\times\det(\Sigma_\beta)^{-1}\exp\left\{-\dfrac{1}{2}\left\lbrack(\beta_Y-\beta)^\prime\Sigma_\beta^{-1}(\beta_Y-\beta)+(\beta_Z-\beta)^\prime\Sigma_\beta^{-1}(\beta_Z-\beta)\right\rbrack\right\} \\
@@ -112,11 +112,29 @@ It should be noted that to improve posterior stability in the right-censored cas
 
 Through repeated experimentation, we settle on computing 4 chains each with 2500 posterior draws following a thinning rate of 4 and 1000 burn-in draws to balance computation time, convergence testing capability, effective sample size, and memory usage.
 
-DOCUMENT THE POSTERIOR DIAGNOSTICS HERE, LIKE ACTUALLY DO IT IN SOFTWARE.
+\color{red}
+AUTHOR'S NOTE: Relevant computations will be done here. I advise excluding the plots from this document, and instead referring to an external document to prevent document bloating.
+\color{black}
 
 # 5. Posterior Results and Interpretation
 
+\color{red}
+AUTHOR'S NOTE: Relevant computations will be done here. I advise excluding the plots from this document, and instead referring to an external document to prevent document bloating.
+\color{black}
+
 # 6. Sensitivity Analysis and Model Checking
+
+## Sensitivity Analysis
+
+The default hyperparameters encourage a moderate-to-strong co-pathway dependence relationship between $Y$ and $Z$, both regarding their relationship with $X$ and after controlling for the effects of $X$. To examine the sensitivity of our results to these choices, we re-compute the posterior using less informative priors and examine the downstream effects.
+
+We choose hyperparameter values $a_0=1$, $b_0=3$, and $W_0=I_2/2$ to ease the aforementioned dependence assumptions and therefore let the data likelihood to be the primary driver of the resulting posterior.
+
+The downstream effects of our choice of priors is examined heuristically through comparison of the $rho$ and $\beta_Y,\beta_Z$ posteriors to those of the default hyperparameter model.
+
+\color{red}
+AUTHOR'S NOTE: Relevant computations will be done here. I advise excluding the plots from this document, and instead referring to an external document to prevent document bloating.
+\color{black}
 
 # 7. Alternative Analysis, Comparison, and Bayesian Justification
 
@@ -127,24 +145,24 @@ DOCUMENT THE POSTERIOR DIAGNOSTICS HERE, LIKE ACTUALLY DO IT IN SOFTWARE.
 To assess whether our conclusions depend on the log-normal assumption and on the form of the dependence between outcomes, we fit an alternative model that is built around a common latent progression time. With $Y$, $Z$, and $X$ defined as in Section 2, let $T$ be a subject-level latent progression event time. We posit
 
 $$
-  \begin{aligned}
+\begin{aligned}
 T\mid X,\beta,\alpha_T&\sim\mathrm{Gamma}\left(\alpha_T,\ \alpha_T e^{-X^\prime\beta}\right), \\
 Y\mid T,\alpha_Y&\sim\mathrm{Gamma}\left(\alpha_Y,\ \alpha_Y/T\right), \\
 Z\mid T,\delta,\alpha_Z&\sim\mathrm{Gamma}\left(\alpha_Z,\ \alpha_Z/(e^{\delta}T)\right),
 \end{aligned}
 $$
   
-  where the gamma distributions are parameterized by shape and rate, and $Y$ and $Z$ are conditionally independent given $T$. Under this specification
+where the gamma distributions are parameterized by shape and rate. It can be seen that $Y$ and $Z$ are assumed to be conditionally independent given $T$. Under this specification
 
 $$
-  \mathbb{E}[T\mid X]=e^{X^\prime\beta},
+\mathbb{E}[T\mid X]=e^{X^\prime\beta},
 \qquad
 \mathbb{E}[Y\mid T]=T,
 \qquad
 \mathbb{E}[Z\mid T]=e^{\delta}T,
 $$
   
-  so the latent progression time $T$ carries all of the covariate information, and the PSA and PCa progression times scatter around it. Equivalently, on the log scale,
+so the latent progression time $T$ carries all of the covariate information, and the PSA and PCa progression times scatter around it. Equivalently, on the log scale,
 
 $$
   \log Y=X^\prime\beta+\log\varepsilon_T+\log\varepsilon_Y,
@@ -152,37 +170,36 @@ $$
 \log Z=X^\prime\beta+\delta+\log\varepsilon_T+\log\varepsilon_Z,
 $$
   
-  with independent $\varepsilon_A\sim\mathrm{Gamma}(\alpha_A,\alpha_A)$ for $A\in\{T,Y,Z\}$.
+with independent $\varepsilon_A\sim\mathrm{Gamma}(\alpha_A,\alpha_A)$ for $A\in\{T,Y,Z\}$.
 
-This formulation imposes the conditional dependence between $Y$ and $Z$ given $X$ directly, through the shared latent time, rather than through a covariance parameter. It represents the latent health and disease progression motivated in Section 2 as an explicit event time: a subject whose underlying disease progresses late tends to show late PSA progression and late PCa progression. The implied covariance of the log event times given $X$ is
+This formulation imposes the conditional dependence between $Y$ and $Z$ given $X$ directly through the shared latent time $T$. It represents the latent health and disease progression motivated in Section 2 as an explicit event time; Intuitively, a subject whose underlying disease progresses late tends to show late PSA progression and late PCa progression. The implied partial covariance of the log event times given $X$ is
 
 $$
-  \mathrm{Cov}\left(\begin{bmatrix}\log Y\\\log Z\end{bmatrix}\Big|X\right)=
-  \begin{bmatrix}
+\mathrm{Cov}\left(\begin{bmatrix}\log Y\\\log Z\end{bmatrix}\mid X\right)=\begin{bmatrix}
 \psi_1(\alpha_T)+\psi_1(\alpha_Y) & \psi_1(\alpha_T) \\
 \psi_1(\alpha_T) & \psi_1(\alpha_T)+\psi_1(\alpha_Z)
 \end{bmatrix},
 $$
   
-  where $\psi_1$ is the trigamma function, so that $\mathrm{Var}(\log\varepsilon_A)=\psi_1(\alpha_A)$. The co-pathway correlation
+where $\psi_1$ is the trigamma function, so that $\mathrm{Var}(\log\varepsilon_A)=\psi_1(\alpha_A)$. The co-pathway correlation
 
 $$
-  \rho=\frac{\psi_1(\alpha_T)}{\sqrt{\left(\psi_1(\alpha_T)+\psi_1(\alpha_Y)\right)\left(\psi_1(\alpha_T)+\psi_1(\alpha_Z)\right)}}
+\rho=\frac{\psi_1(\alpha_T)}{\sqrt{\left(\psi_1(\alpha_T)+\psi_1(\alpha_Y)\right)\left(\psi_1(\alpha_T)+\psi_1(\alpha_Z)\right)}}
 $$
   
-  is the correlation of the log event times, the same quantity as $\rho=\sigma_{YZ}/(\sigma_Y\sigma_Z)$ in the primary model, so the two can be compared directly. It is large when variation in the latent progression time dominates the outcome-specific scatter around it, and it is restricted to $(0,1)$. A non-negative association is clinically reasonable, since a common disease process should delay or accelerate both types of progression together. It can be checked against the posterior of $\rho$ under the primary model, which is unrestricted.
+is the correlation of the log event times, analogous to $\rho=\sigma_{YZ}/(\sigma_Y\sigma_Z)$ in the primary model, thus facilitating model-to-model comparison of the estimated correlation structures. It is large when variation in the latent progression time dominates the outcome-specific scatter around it, and is restricted to the $(0,1)$ interval. A non-negative association is clinically reasonable, since a common disease process should delay or accelerate both types of progression together. It can be checked against the posterior of $\rho$ under the primary model, which is unrestricted.
 
 #### Shared covariate effects
 
 Because covariates enter only through $T$, the alternative model replaces the primary model's hierarchical prior $\beta_Y,\beta_Z\mid\beta,\Sigma_\beta\overset{iid}{\sim}\mathrm{N}(\beta,\Sigma_\beta)$ with a single coefficient vector $\beta$. Each covariate therefore has the same multiplicative effect on PSA and PCa progression: $\exp(\beta_j)$ is the time ratio associated with a unit change in $X_j$ for $T$, $Y$, and $Z$ alike. The primary model's hierarchical prior was motivated by the expectation that both outcomes are roughly symmetrically affected by the treatment and demographic covariates. The alternative model makes that expectation exact, and it plays the role of the limiting case $\Sigma_\beta\to0$, apart from the outcome-specific offset $\delta$.
 
-This is a stronger conditional distribution assumption on $Y,Z\mid X$, and it is the main way the alternative model departs from the primary one. It removes $p$ regression parameters and the hierarchical variance parameters. The cost is that a covariate acting on one outcome more than the other cannot be represented. For example, anti-androgen therapy acts directly on PSA production, and bisphosphonates act on bone, where radiographic metastases are commonly detected. If such effects were substantial, the shared $\beta$ would average them across the two outcomes. We assess this by comparing the alternative model's $\beta$ with the primary model's posteriors for $\beta_Y$ and $\beta_Z$.
+This is a stronger conditional distribution assumption on $Y,Z\mid X$, and it is the main way the alternative model departs from the primary one. It removes $p$ regression parameters and the hierarchical variance parameters. The cost is that a covariate acting on one outcome more than the other cannot be represented, which may be the case for certain treatments. If such effects were substantial, the shared $\beta$ would average them across the two outcomes. We assess this by comparing the alternative model's $\beta$ with the primary model's posteriors for $\beta_Y$ and $\beta_Z$.
 
-NEED comparison of $\beta$ with the primary model's $\beta_Y$ and $\beta_Z$
+AUTHOR' NOTE: We need to provide comparison of $\beta$ with the primary model's $\beta_Y$ and $\beta_Z$.
 
 #### Offset between outcomes
 
-The parameter $\delta$ allows PCa progression to occur systematically later (or earlier) than PSA progression for a given latent progression time, with $e^{\delta}=\mathbb{E}[Z\mid T]/\mathbb{E}[Y\mid T]$. Without it, the model would force both outcomes to occur at the same time on average, which is implausible given that rising PSA typically precedes radiographic evidence of progression. Only one offset is identifiable alongside the intercept in $\beta$, so $Y$ is centered on $T$ and the offset is placed on $Z$.
+The parameter $\delta$ allows PCa progression to occur systematically later (or earlier) than PSA progression for a given latent progression time, with $e^{\delta}=\mathbb{E}[Z\mid T]/\mathbb{E}[Y\mid T]$. Without it, the model would force both outcomes to occur at the same time on average, which would be a questionable assumption. Only one offset is identifiable alongside the intercept in $\beta$, so $Y$ is centered on $T$ and the offset is placed on $Z$.
 
 #### Choice of the gamma distribution
 
@@ -194,27 +211,14 @@ The gamma and log-normal distributions differ in hazard shape and tails. The log
 
 The observed data $(x,y^L,y^R,z^L,z^R)_i$, $i=1,\cdots,n$, are as in Section 2. Because $Y$ and $Z$ are conditionally independent given $T$, the likelihood factorizes given the latent progression times $t=(t_1,\cdots,t_n)$:
   
-  $$
-  \begin{aligned}
+$$
+\begin{aligned}
 &p((y^L_i,y^R_i,z^L_i,z^R_i)_{i=1,\cdots,n}\mid t,\delta,\alpha_Y,\alpha_Z) \\
 &\qquad=\prod_{i=1}^n\Big\lbrack F_Y(y^R_i\mid t_i)-F_Y(y^L_i\mid t_i)\Big\rbrack\Big\lbrack F_Z(z^R_i\mid t_i)-F_Z(z^L_i\mid t_i)\Big\rbrack,
 \end{aligned}
 $$
   
-  where $F_Y(\cdot\mid t_i)$ is the gamma CDF with shape $\alpha_Y$ and rate $\alpha_Y/t_i$, $F_Z(\cdot\mid t_i)$ is the gamma CDF with shape $\alpha_Z$ and rate $\alpha_Z/(e^{\delta}t_i)$, and $F_A(0\mid t_i)=0$. The marginal likelihood integrates each subject's term over $t_i\sim\mathrm{Gamma}(\alpha_T,\alpha_T e^{-x_i^\prime\beta})$. In place of the bivariate normal CDF of the primary model, the dependence between outcomes enters through the shared $t_i$.
-
-### Analysis Outcome Measures
-
-The outcome measures are unchanged from Section 2. For each posterior draw of $(\beta,\delta,\alpha_T,\alpha_Y,\alpha_Z)$, a posterior predictive pair for a subject with covariates $X^*$ is generated by drawing $T^*\sim\mathrm{Gamma}(\alpha_T,\alpha_T e^{-X^{*\prime}\beta})$, and then $Y^*\mid T^*$ and $Z^*\mid T^*$ independently from their gamma distributions. The confusion matrix of Section 2 is estimated at the one-year horizon $t=365$, from which
-
-$$
-\begin{aligned}
-\text{sensitivity}&=\mathbb{P}(Y^*<t\mid Z^*<t,X^*,Y,X), \\
-\text{specificity}&=\mathbb{P}(Y^*>t\mid Z^*>t,X^*,Y,X).
-\end{aligned}
-$$
-
-As in the primary model, the posterior distribution of $\rho$ is examined as a heuristic to support the contingency table analysis.
+where $F_Y(\cdot\mid t_i)$ is the gamma CDF with shape $\alpha_Y$ and rate $\alpha_Y/t_i$, $F_Z(\cdot\mid t_i)$ is the gamma CDF with shape $\alpha_Z$ and rate $\alpha_Z/(e^{\delta}t_i)$, and $F_A(0\mid t_i)=0$. The marginal likelihood integrates each subject's term over $t_i\sim\mathrm{Gamma}(\alpha_T,\alpha_T e^{-x_i^\prime\beta})$. In place of the bivariate normal CDF of the primary model, the dependence between outcomes enters through the shared $t_i$.
 
 ### Prior Distributions
 
@@ -228,11 +232,11 @@ $$
   
   with $m_0=0$ and $v_0=1000$. The Wishart prior on $\Sigma_{YZ}$ is replaced by priors on the three gamma shapes, which together determine the log-time covariance:
   
-  $$
-  \alpha_T,\alpha_Y,\alpha_Z\overset{iid}{\sim}\mathrm{Gamma}(s_0,r_0),\qquad s_0=2,\ r_0=1.
+$$
+\alpha_T,\alpha_Y,\alpha_Z\overset{iid}{\sim}\mathrm{Gamma}(s_0,r_0),\qquad s_0=2,\ r_0=1.
 $$
   
-  This prior has its mode at $\alpha_A=1$ (the exponential model), mean 2, and central 95% interval $(0.24,5.57)$. It covers decreasing, constant, and increasing hazards, and coefficients of variation between roughly 0.42 and 2.03, without favoring either hazard direction.
+This prior has its mode at $\alpha_A=1$ (the exponential model), mean 2, and central 95% interval $(0.24,5.57)$. It covers decreasing, constant, and increasing hazards, and coefficients of variation between roughly 0.42 and 2.03, without favoring either hazard direction.
 
 ### Posterior Computation and Diagnostics
 
@@ -248,13 +252,29 @@ $$
 \end{aligned}
 $$
   
-  As with the primary model, we sample from the posterior using `rjags`, with the interval-censored event times and the latent progression times treated as latent variables, and the event times constrained to their observed intervals. For comparability, the alternative model uses the same data handling as Section 4: upper bounds are set to the minimum of the factual upper bound and 2000, and lower bounds to the minimum of the factual lower bound and 1000. The MCMC settings also match the primary model: 4 chains, each with 1000 burn-in iterations and 2500 retained draws at a thinning rate of 4, for 10,000 posterior draws in total. Posterior draws of $\rho$ and of the log-time covariance matrix are computed from the draws of $\alpha_T$, $\alpha_Y$, and $\alpha_Z$.
+As with the primary model, we sample from the posterior using `rjags`, with the interval-censored event times and the latent progression times treated as latent variables, and the event times constrained to their observed intervals. For comparability, the alternative model uses the same data handling as Section 4: upper bounds are set to the minimum of the factual upper bound and 2000, and lower bounds to the minimum of the factual lower bound and 1000. The MCMC settings also match the primary model: 4 chains, each with 1000 burn-in iterations and 2500 retained draws at a thinning rate of 4, for 10,000 posterior draws in total. Posterior draws of $\rho$ and of the log-time covariance matrix are computed from the draws of $\alpha_T$, $\alpha_Y$, and $\alpha_Z$.
 
 The three shape parameters are separated only through how the two outcomes vary jointly around the latent progression time, so they may mix more slowly than $\beta$ and $\delta$. We therefore examine their diagnostics first, and lengthen the chains if they do not meet the convergence criterion.
 
-Convergence is assessed with the same `posterior_diagnostics()` function used for the primary model. It produces trace plots and autocorrelation plots for each parameter, the Gelman–Rubin potential scale reduction factor $\hat R$ (target $\hat R<1.1$), the effective sample size, and the Monte Carlo standard error.
+Standard posterior diagnostics are done symmetrically to those of the lognormal model.
 
-## Model Comparisons
+\color{red}
+AUTHOR'S NOTE: Relevant computations will be done here. I advise excluding the plots from this document, and instead referring to an external document to prevent document bloating.
+\color{black}
+
+### Analysis Outcome Measures and Model Comparisons
+
+The outcome measures are unchanged from Section 2, derived primarily from the posterior predictive distribution-derived contingency table. Relevant metrics are provided below.
+
+\color{red}
+AUTHOR'S NOTE: Relevant computations will be done here.
+\color{black}
+
+Analogous to the analysis using the primary model, the posterior distribution of $\rho$ is also examined as a heuristic to support the contingency table analysis.
+
+\color{red}
+AUTHOR'S NOTE: Relevant computations will be done here.
+\color{black}
 
 ## Bayesian Justification
 
@@ -282,7 +302,7 @@ For each simulation, we sample $n=600$ realizations of the $p=10$-vector $x_i\ov
 
 The Bayesian methods are performed on the data as described earlier in the text, with the exception of running a single chain of length 1000 with no thinning instead of 4 of length 2500 with a thinning rate of 4. This was done to ease the computational burden under repeated simulation, and we find no issues with posterior convergence under these MCMC parameters. The Frequentist approach optimizes its respective likelihood (which is withheld due to being largely analogous with the Bayesian data likelihood) with respect to parameters $\beta_Y,\beta_Z,\sigma^2_Y,\sigma^2_Z$, implemented using the `survival` package. All models include an intercept term to capture the event time offset included in the simulation procedure.
 
-The frequentist approach returns fitted values for the latent $Y,Z$ pair per sample, and we use the exponential of the log-posterior predictive distribution mean as the Bayesian point estimate for the latent outcomes. Exponentiating the log-scale mean is far more numerically stable than using the mean of the raw posterior predictive distribution, and in line with common survival analysis practice. Methods are compared by the root mean squared difference between estimated and actual log-event times for $Y$ and $Z$, analogous to RMSE on the log-time-to-event scale.
+The frequentist approach returns fitted values for the latent $Y,Z$ pair per sample, and we use the exponential of the log-posterior predictive distribution mean as the Bayesian point estimate for the latent outcomes. Exponentiating the log-scale mean is far more numerically stable than using the mean of the raw posterior predictive distribution, and in line with common survival analysis practice. Methods are compared by the root mean squared difference between estimated and actual log-event times for $Y$ and $Z$, i.e. RMSE on the log-outcome scale.
 
 We perform 50 simulation replications under parameters $v_o=1$, $\Sigma_\beta=I_p/4$, and $\Sigma_{YZ}=((2,1)^\prime,(1,2)^\prime)$. The results are presented in terms of per-simulation error comparisons between the three methods.
 
