@@ -93,17 +93,17 @@ progression = do(f=\(){
 # Lognormal model -------------------------------------------------------------------
 
 # lognormal data-to-posterior model pipeline
-lognorm_model = function(boundsyz,       # n by 2 (y vs z) by 2 (lower vs upper bound) array
-                         x,              # n by p design matrix
-                         m0 = 0,         # mean of global beta vector entries
-                         v0 = 1e+3,      # variance of global beta vector entries
-                         a0 = 2,         # shape parameter of betaYZ precision matrix diagonal
-                         b0 = 1,         # rate parameter of betaYZ precision matrix diagonal
-                         d0 = 2,         # df of SigmaYZ Wishart prior
-                         W0 = diag(2)/2, # scale matrix of SigmaYZ Wishart prior
-                         M = 1e+4,       # number of posterior draws after burn-in
-                         burnin = 1e+4,  # number of burn-in draws
-                         thin = 1        # post burn-in thinning interval
+lognorm_model = function(boundsyz,           # n by 2 (y vs z) by 2 (l vs r bound) array
+                         x,                  # n by p design matrix
+                         m0 = 0,             # mean of global beta vector entries
+                         v0 = 1e+3,          # variance of global beta vector entries
+                         a0 = 2,             # shape param of betaYZ precision matrix diag
+                         b0 = 1,             # rate param of betaYZ precision matrix diag
+                         d0 = 2,             # df of SigmaYZ inverse Wishart prior
+                         W0 = (1+diag(2))/4, # scale matrix of SigmaYZ inv Wishart prior
+                         M = 2500,           # number of posterior draws after burn-in
+                         burnin = 1e+4,      # number of burn-in draws
+                         thin = 4            # post burn-in thinning interval
                          ) {
   model_string = "
   model {
@@ -119,8 +119,8 @@ lognorm_model = function(boundsyz,       # n by 2 (y vs z) by 2 (lower vs upper 
     for (j in 1:p) { for (k in 1:2) { betayz[j,k] ~ dnorm(beta[j], tausqbeta[j]) } }
     # priors
     beta ~ dmnorm(mubeta[1:p], diagbeta[1:p,1:p])
-    for (j in 1:p) { mubeta[j] = 0 }
-    for (j in 1:p) { tausqbeta[j] ~ dgamma(2, 1) }  # equiv to gamma prior on precision
+    for (j in 1:p) { mubeta[j] = m0 }
+    for (j in 1:p) { tausqbeta[j] ~ dgamma(a0, b0) }  # equiv to gamma prior on precision
     Omegayz ~ dwish(W0[1:2,1:2], d0)                # Wishart prior on event covariance
     # additional posteriors to be returned
     Sigmayz = inverse(Omegayz)                      # latent outcome covariance matrix
@@ -134,9 +134,12 @@ lognorm_model = function(boundsyz,       # n by 2 (y vs z) by 2 (lower vs upper 
     Iyz = matrix(1, nrow=n, ncol=2),
     n = n,
     p = p,
+    m0 = m0,
     diagbeta = diag(p)/v0,
-    W0 = W0,
-    d0 = d0
+    a0 = a0,
+    b0 = b0,
+    d0 = d0,
+    W0 = W0
   )
   initslist = list(
     betayz = matrix(rep(0, 2*p), ncol=2),
