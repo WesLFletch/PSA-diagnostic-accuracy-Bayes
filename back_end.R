@@ -198,6 +198,105 @@ lognorm_sample_ppd = function(x,            # n by p design matrix
   })
 }
 
+# Gamma latent time model -----------------------------------------------------------
+
+# gamma common-latent-time data-to-posterior model pipeline
+gamma_model = function(boundsyz,      # n by 2 (y vs z) by 2 (lower vs upper bound) array
+                       x,             # n by p design matrix (first column intercept)
+                       m0 = 0,        # mean of beta vector entries
+                       v0 = 1e+3,     # variance of beta vector entries and delta
+                       s0 = 2,        # shape parameter of alpha gamma priors
+                       r0 = 1,        # rate parameter of alpha gamma priors
+                       M = 1e+4,      # number of posterior draws after burn-in
+                       burnin = 1e+4, # number of burn-in draws
+                       thin = 1,      # post burn-in thinning interval
+                       seed = 1       # JAGS random seed (use a different one per chain)
+                       ) {
+  model_string = "
+  model {
+    # data likelihood
+    for (i in 1:n) {
+      # observations are interval-censored
+      for (j in 1:2) { Iyz[i,j] ~ dinterval(yz[i,j], boundsyz[i,j,1:2]) }
+      # Y and Z scatter around the common latent progression time t
+      yz[i,1] ~ dgamma(alphay, alphay/t[i])              # E[Y | t] = t
+      yz[i,2] ~ dgamma(alphaz, alphaz/(exp(delta)*t[i])) # E[Z | t] = exp(delta) t
+      # common latent progression time, the only place covariates enter
+      t[i] ~ dgamma(alphat, alphat/exp(inprod(x[i,1:p], beta[1:p])))
+    }
+    # priors
+    for (j in 1:p) { beta[j] ~ dnorm(m0, 1/v0) }
+    delta ~ dnorm(0, 1/v0)
+    alphat ~ dgamma(s0, r0)
+    alphay ~ dgamma(s0, r0)
+    alphaz ~ dgamma(s0, r0)
+  }
+  "
+  n = nrow(x)
+  p = ncol(x)
+  datalist = list(
+    x = x,
+    boundsyz = boundsyz,
+    Iyz = matrix(1, nrow=n, ncol=2),
+    n = n,
+    p = p,
+    m0 = m0,
+    v0 = v0,
+    s0 = s0,
+    r0 = r0
+  )
+  yz_init = apply(boundsyz, 1:2, mean) # latent times start inside their intervals
+  initslist = list(
+    yz = yz_init,
+    t = yz_init[,1],
+    beta = c(log(mean(yz_init[,1])), rep(0, p-1)),
+    delta = log(mean(yz_init[,2])/mean(yz_init[,1])),
+    alphat = 1,
+    alphay = 1,
+    alphaz = 1,
+    .RNG.name = "base::Mersenne-Twister",
+    .RNG.seed = seed
+  )
+  out_model = jags.model(textConnection(model_string), data=datalist, inits=initslist)
+  update(out_model, n.iter=burnin)
+  posterior = coda.samples(
+    out_model,
+    variable.names=c("beta", "delta", "alphat", "alphay", "alphaz"),
+    n.iter=M*thin,
+    thin=thin
+  )
+  draws = as.matrix(posterior[[1]])
+  alphas = draws[, c("alphat", "alphay", "alphaz")] %>% t() # 3 by M
+  M_out = nrow(draws)
+  # implied covariance of (log Y, log Z) given X, comparable with lognorm_model's Sigmayz
+  Sigmayz = sapply(1:M_out, \(m){
+    trigamma(alphas["alphat", m]) + diag(trigamma(alphas[c("alphay", "alphaz"), m]))
+  }) %>%
+    array(c(2, 2, M_out))
+  list(
+    beta = draws[, paste0("beta[", 1:p, "]"), drop=FALSE] %>% t(), # p by M array
+    delta = draws[, "delta"],                                      # length M vector
+    alphas = alphas,                                               # 3 by M (T, Y, Z shapes)
+    Sigmayz = Sigmayz                                              # 2 by 2 by M array
+  )
+}
+
+# sample from gamma model posterior predictive distribution to get M by n by 2 array
+gamma_sample_ppd = function(x,           # n by p design matrix
+                            beta_draws,  # p by M array
+                            delta_draws, # length M vector
+                            alpha_draws  # 3 by M array (T, Y, Z shapes)
+                            ) {
+  n = nrow(x)
+  M = ncol(beta_draws)
+  arrapply(1:M, f=\(m){
+    a = alpha_draws[,m]
+    t = rgamma(n, a[1], a[1]/exp(drop(x%*%beta_draws[,m]))) # common latent progression time
+    cbind(rgamma(n, a[2], a[2]/t),                          # PSA progression
+          rgamma(n, a[3], a[3]/(exp(delta_draws[m])*t)))    # PCa progression
+  })
+}
+
 # Study outcomes --------------------------------------------------------------------
 
 # compute confusion matrices from posterior predictive distribution (2 by 2 by n output)
