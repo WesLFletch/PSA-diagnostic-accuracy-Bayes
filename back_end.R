@@ -6,14 +6,6 @@ library("PipeHelpR") # devtools::install_github("WesLFletch/PipeHelpR")
 # Compute real data -----------------------------------------------------------------
 
 progression = do(f=\(){
-  subdir = "D4320C00015 De-Identified RDB Data"
-  vsit = haven::read_sas(paste(getwd(), subdir, "r_visit.sas7bdat",  sep="/"))
-  demo = haven::read_sas(paste(getwd(), subdir, "r_dem.sas7bdat",    sep="/"))
-  capx = haven::read_sas(paste(getwd(), subdir, "r_caprx.sas7bdat",  sep="/"))
-  prog = haven::read_sas(paste(getwd(), subdir, "rd_psa.sas7bdat",   sep="/"))
-  secg = haven::read_sas(paste(getwd(), subdir, "r_ecg.sas7bdat",    sep="/"))
-  opia = haven::read_sas(paste(getwd(), subdir, "r_opiuse.sas7bdat", sep="/"))
-  rcst = haven::read_sas(paste(getwd(), subdir, "rd_rcist.sas7bdat", sep="/"))
   # SUBJ  is subject identifier
   # VISIT is a numerical visit identifier for each subject
   # vsit$VISDYTRT is number of days since treatment
@@ -26,6 +18,26 @@ progression = do(f=\(){
   # secg$ECGEVAL  is indicator of ECG irregularity
   # opia$OPIUSE   is indicator of opiate prescription
   # rcst$RNNEWLES is indicator of new lesions
+  # load needed files
+  subdir = "D4320C00015 De-Identified RDB Data"
+  vsit = haven::read_sas(paste(getwd(), subdir, "r_visit.sas7bdat",  sep="/"))
+  demo = haven::read_sas(paste(getwd(), subdir, "r_dem.sas7bdat",    sep="/"))
+  capx = haven::read_sas(paste(getwd(), subdir, "r_caprx.sas7bdat",  sep="/")) %>%
+    # remedy row duplication induced by multiple treatments per SUBJ
+    summarise(
+      .by=SUBJ,
+      CXCLASS_chemo           = as.numeric(any(CXCLASS =="0")),
+      CXCLASS_immuno_hormonal = as.numeric(any(CXCLASS =="1")),
+      CXCLASS_other_systemic  = as.numeric(any(CXCLASS =="2")),
+      CXCLASS_immuno          = as.numeric(any(CXCLASS =="3")),
+      CXCLASS_hormonal        = as.numeric(any(CXCLASS =="4")),
+      BISPHOS                 = as.numeric(any(BISPHOS =="1")),
+      ANTIANDR                = as.numeric(any(ANTIANDR=="1"))
+    )
+  prog = haven::read_sas(paste(getwd(), subdir, "rd_psa.sas7bdat",   sep="/"))
+  secg = haven::read_sas(paste(getwd(), subdir, "r_ecg.sas7bdat",    sep="/"))
+  opia = haven::read_sas(paste(getwd(), subdir, "r_opiuse.sas7bdat", sep="/"))
+  rcst = haven::read_sas(paste(getwd(), subdir, "rd_rcist.sas7bdat", sep="/"))
   # compute full data
   vsit %>% distinct(SUBJ, VISIT, VISDYTRT) %>% # start with patient/visits
     drop_na() %>%
@@ -71,23 +83,11 @@ progression = do(f=\(){
         reduce(full_join, by="SUBJ") # join all the outcome intervals together
     }) %>%
     # join demographic variables
-    left_join(
-      demo %>% distinct(SUBJ, ETHGRP, AGEGRP),
-      by=c("SUBJ" = "SUBJ")
-    ) %>%
+    left_join(demo %>% distinct(SUBJ, ETHGRP, AGEGRP), by=c("SUBJ" = "SUBJ")) %>%
     # join cancer therapy variables
-    left_join(
-      capx %>% distinct(SUBJ, CXCLASS, BISPHOS, ANTIANDR),
-      by=c("SUBJ" = "SUBJ")
-    ) %>%
+    left_join(capx, by=c("SUBJ" = "SUBJ")) %>%
     # clean up demographic and cancer treatment variables
-    mutate(
-      ETHGRP = as.factor(ETHGRP),
-      AGEGRP = as.factor(AGEGRP),
-      CXCLASS = as.factor(replace_when(CXCLASS, CXCLASS=="" ~ "none")),
-      BISPHOS = as.numeric(BISPHOS),
-      ANTIANDR = as.numeric(ANTIANDR)
-    )
+    mutate(ETHGRP = as.factor(ETHGRP), AGEGRP = as.factor(AGEGRP))
 })
 
 # Lognormal model -------------------------------------------------------------------
