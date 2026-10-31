@@ -1,0 +1,14 @@
+---
+title: "Appendix -- STAT-638 Group Project 10: Diagnostic Accuracy of PSA Progression in Prostate Cancer"
+author: "Wesley Fletcher and Peyton Miles"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Section 4.
+
+## Lognormal model posterior diagnostics
