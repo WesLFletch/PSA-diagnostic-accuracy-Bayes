@@ -9,6 +9,96 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+library("rjags")
+library("survival")
+library("tidyverse")
+library("PipeHelpR")
+source("back_end.R")
+```
+
 # Section 4.
 
+## Draw Lognormal model posterior samples
+
+```{r}
+nna_idx = which(!is.na(progression$RNNEWLES_lb))
+boundsyz = array(
+  c(
+    progression$PSPCRIT_lb[nna_idx], progression$RNNEWLES_lb[nna_idx],
+    progression$PSPCRIT_rb[nna_idx], progression$RNNEWLES_rb[nna_idx]
+  ),
+  dim=c(length(nna_idx), 2, 2)
+) %>%
+  do(\(arr){
+    arr[,,1] = pmin(arr[,,1], 1000)
+    arr[,,2] = pmin(arr[,,2], 2000)
+    arr
+  })
+x = model.matrix(reformulate(colnames(progression)[10:17]), data=progression[nna_idx,])
+# compute many posterior chains
+set.seed(123)
+lognorm_posterior_chains = lapply(1:4, \(i){
+  lognorm_model(
+    boundsyz=boundsyz,
+    x=x,
+    m0=0,
+    v0=1e+3,
+    a0=2,
+    b0=1,
+    d0=2,
+    W0=(1+diag(2))/4,
+    M=2500,
+    burnin=1e+4,
+    thin=4
+  )
+})
+```
+
 ## Lognormal model posterior diagnostics
+
+```{r}
+posterior_diagnostics_lorgnorm = function(post_chains, param, idx1, idx2, lag_max=50) {
+  post_chains %>%
+    lapply(\(p)p[[param]][idx1,idx2,]) %>%
+    do(\(l)do.call(posterior_diagnostics, append(l, c(lag_max = lag_max)))) %>%
+    do(\(l){
+      l$trace_plot = l$trace_plot +
+        ggtitle(paste0(param, "[", idx1, ",", idx2, "] trace plot"))
+      l$acf_plot = l$acf_plot + ggtitle(paste0(param, "[", idx1, ",", idx2, "] ACF plot"))
+      l
+    })
+}
+for (idx in 1:14) {
+  for (yz in 1:2) {
+    posterior_diagnostics_lorgnorm(lognorm_posterior_chains, "betayz", idx, yz)
+  }
+}
+posterior_diagnostics_lorgnorm(lognorm_posterior_chains, "Sigmayz", 1, 1)
+posterior_diagnostics_lorgnorm(lognorm_posterior_chains, "Sigmayz", 1, 2)
+posterior_diagnostics_lorgnorm(lognorm_posterior_chains, "Sigmayz", 2, 2)
+```
+
+# Section 5.
+
+## Plot regression coefficient posteriors
+
+```{r}
+plot_beta_densities_lorgnorm = function(post_chains, idx) {
+  post_chains %>%
+    lapply(\(p)p$betayz[idx,,]) %>%
+    do.call(cbind, .) %>%
+    t() %>%
+    setColnames(paste0(c("betay", "betaz"), idx)) %>%
+    as.data.frame.table() %>%
+    as_tibble() %>%
+    mutate(Parameter = Var2, Posterior = Freq, .keep="none") %>%
+    ggplot() +
+    geom_density(aes(x=Posterior, fill=Parameter), alpha=0.7) +
+    ggtitle(paste0("Posterior distributions of betay", idx, " and betaz", idx)) +
+    ylab("Density") +
+    scale_fill_manual(values=c("salmon", "lightblue")) +
+    theme_bw()
+}
+for (idx in 1:14) print(plot_beta_densities_lorgnorm(lognorm_posterior_chains, idx))
+```

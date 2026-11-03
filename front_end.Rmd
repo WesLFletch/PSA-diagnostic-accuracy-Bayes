@@ -112,15 +112,13 @@ It should be noted that to improve posterior stability in the right-censored cas
 
 Through repeated experimentation, we settle on computing 4 chains each with 2500 posterior draws following a thinning rate of 4 and 1000 burn-in draws to balance computation time, convergence testing capability, effective sample size, and memory usage.
 
-\color{red}
-AUTHOR'S NOTE: Relevant computations will be done here. I advise excluding the plots from this document, and instead referring to an external document to prevent document bloating.
-\color{black}
+To preserve document space, we sample from the posterior and present trace and ACF plots for the regression coefficients and (co)variance term posterior samples in the appendix file under Section 4. A majority of the parameter samples experience good convergence and acceptable as seen in the trace plots, and ACF tapers off to 0 between lag 10 and 20. This does indicate relatively strong sample-to-sample autocorrelation, but this is unsurprising due to the complicated hierarchical structure of our priors and high-dimensionality of the parameter space. The convergence as evaluated by Gelman-Rubin diagnostic is very good, and MCSE is consistently quite low relative to the scale of the parameter posterior centers.
 
 # 5. Posterior Results and Interpretation
 
-\color{red}
-AUTHOR'S NOTE: Relevant computations will be done here. I advise excluding the plots from this document, and instead referring to an external document to prevent document bloating.
-\color{black}
+## Posterior Examinations
+
+Again for the purposes of preserving document space, we display the posterior density plots in the appendix and only comment on the most important findings here.
 
 # 6. Sensitivity Analysis and Model Checking
 
