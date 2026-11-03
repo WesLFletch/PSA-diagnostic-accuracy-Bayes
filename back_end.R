@@ -27,7 +27,6 @@ progression = do(f=\(){
     summarise(
       .by=SUBJ,
       CXCLASS_chemo           = as.numeric(any(CXCLASS =="0")),
-      CXCLASS_immuno_hormonal = as.numeric(any(CXCLASS =="1")),
       CXCLASS_other_systemic  = as.numeric(any(CXCLASS =="2")),
       CXCLASS_immuno          = as.numeric(any(CXCLASS =="3")),
       CXCLASS_hormonal        = as.numeric(any(CXCLASS =="4")),
