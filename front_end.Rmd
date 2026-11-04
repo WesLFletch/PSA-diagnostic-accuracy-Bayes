@@ -258,6 +258,9 @@ Standard posterior diagnostics are done symmetrically to those of the lognormal 
 
 \color{red}
 AUTHOR'S NOTE: Relevant computations will be done here. I advise excluding the plots from this document, and instead referring to an external document to prevent document bloating.
+All Gelman–Rubin statistics are below 1.1 (maximum 1.042, intercept), with near-identical per-chain posterior means and fully overlapping trace plots. Effective sample sizes range from 234 (intercept) to 2,240 ($\alpha_Y$); the intercept and class 4 therapy coefficient mix slowest, as 94% of subjects received class 4 therapy. Plots are provided in the supplementary document.
+
+The offset is $\delta = 0.41$ (95% CrI 0.26, 0.55), so PCa progression occurs about 1.5 times later than PSA progression for a given latent progression time. The shapes are $\alpha_T = 5.39$ (3.20, 9.58), $\alpha_Y = 1.12$ (0.92, 1.35), and $\alpha_Z = 3.04$ (2.19, 4.41).
 \color{black}
 
 ### Analysis Outcome Measures and Model Comparisons
@@ -266,12 +269,21 @@ The outcome measures are unchanged from Section 2, derived primarily from the po
 
 \color{red}
 AUTHOR'S NOTE: Relevant computations will be done here.
+| | No PSA Progression | PSA Progression |
+|--:|--:|--:|
+| No PCa Progression | 0.31 | 0.34 |
+| PCa Progression | 0.09 | 0.27 |
+
+At $t = 365$, averaged over the $n = 412$ subjects, the alternative model gives sensitivity 0.75 (95% CrI 0.65, 0.84), specificity 0.48 (0.41, 0.56), PPV 0.44 (0.36, 0.52), and NPV 0.78 (0.69, 0.86), compared with [ ] and [ ] under the primary model. PSA progression within one year is predicted for 60% of subjects versus 35% for PCa progression, so PSA progression is sensitive but nonspecific: a negative result is more informative than a positive one. Subjects with prior class 0 therapy show higher sensitivity (0.85) and lower specificity (0.31) than those without (0.69, 0.50), but under the shared-$\beta$ structure this reflects their faster progression relative to the horizon, not a difference in PSA's diagnostic value.
+
+Compared with a nonparametric (Turnbull) estimate, the model overpredicts one-year progression for both PSA (0.60 vs 0.55) and PCa (0.35 vs 0.27). This is likely a consequence of capping censored upper bounds at 2000 days, which forces all latent times below that value; as the primary model uses the same cap, the model comparison remains fair, but both models' accuracy estimates should be read with this in mind.
 \color{black}
 
 Analogous to the analysis using the primary model, the posterior distribution of $\rho$ is also examined as a heuristic to support the contingency table analysis.
 
 \color{red}
 AUTHOR'S NOTE: Relevant computations will be done here.
+The alternative model gives $\rho = 0.22$ (95% CrI 0.11, 0.36), compared with [ ] (95% CrI [ , ]) under the primary model. The low value reflects the near-exponential PSA-specific scatter ($\alpha_Y \approx 1.1$): PSA progression varies more around the latent progression time than with it. As $\rho$ is restricted to $(0,1)$ here, only its magnitude is informative. A weak dependence is consistent with the contingency table: PSA progression frequently occurs without subsequent PCa progression within the horizon.
 \color{black}
 
 ## Bayesian Justification
