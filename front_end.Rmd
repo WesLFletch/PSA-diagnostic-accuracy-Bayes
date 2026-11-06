@@ -1,5 +1,5 @@
 ---
-title: "STAT-638 Group Project 10: Diagnostic Accuracy of PSA Progression in Prostate Cancer"
+title: "STAT-638 Group Project 10: Prognostic Accuracy of PSA Progression in Prostate Cancer"
 author: "Wesley Fletcher and Peyton Miles"
 date: "`r Sys.Date()`"
 output: html_document
@@ -17,7 +17,11 @@ Screening for prostate cancer (PCa) is commonly done by taking measures of patie
 
 ## Objective and Data Overview
 
-We seek to evaluate the diagnostic accuracy of the PSA blood test in determining PCa progression post-diagnosis through sensitivity and specificity analyses conducted on a longitudinal clinical trial sponsored by AstraZeneca (trial NCT00626548). The trial examined the efficacy of ZD4054 (Zibotentan) in treating non-metastatic hormone resistant PCa. The protected-access de-identified data contains information on subject follow-ups throughout the longitudinal study, including longitudinal PSA blood test results and screenings for additional lesions since diagnosis (our proxy for true PCa progression), as well as subject demographic and treatment information. Our measures of interest relate to the joint distribution of event times of first progression as detectable by PSA blood test and screening for new lesions.
+We seek to evaluate the prognostic accuracy of the PSA blood test in determining PCa progression post-diagnosis through sensitivity and specificity analyses conducted on a longitudinal clinical trial sponsored by AstraZeneca (trial NCT00626548). The trial examined the efficacy of ZD4054 (Zibotentan) in treating non-metastatic hormone resistant PCa. The protected-access de-identified data contains information on subject follow-ups throughout the longitudinal study, including longitudinal PSA blood test results and screenings for additional lesions since diagnosis (our proxy for true PCa progression), as well as subject demographic and treatment information. Our measures of interest relate to the joint distribution of event times of first progression as detectable by PSA blood test and screening for new lesions.
+
+## Data Features
+
+For baseline covariates, we consider subject age group (`AGEGRP`); ethnic group (`ETHGRP`) with levels "Hispanic or Latino" (1), "Asian" (8), "Chinese" (9), "Japanese" (10), "NA" (98), and "Other" (99); cancer therapies used before the study (`CXCLASS`), Bisphosphonate therapy indicator (`BISPHOS`), and Anti-androgen therapy indicator (`ANTIANDR`). It should be noted that none of these features are "treatments" in the context of this clinical trial data, and that only the study's control arm is present due to trial discontinuation. As such, all of these features are considered to be our covariates.
 
 ## Interval-Censored Longitudinal Data
 
@@ -77,7 +81,7 @@ Given posterior draws for $\beta_Y,\sigma^2_Y,\beta_Z,\sigma^2_Z$, the posterior
 |    PCa Progression | $=\mathbb{P}(Y^*>t,Z^*<t\mid X^*,Y,X)$ | $=\mathbb{P}(Y^*<t,Z^*<t\mid X^*,Y,X)$ |
 |                    |                                        |                                        |
 
-can be used to assess the diagnostic accuracy of PSA in predicting PCa progression at various clinical horizons $t$ and subject treatments/demographics $X$. It is also useful for computing sensitivity, specificity, and other related measures of diagnostic accuracy. We focus on the one-year $(t=365)$ horizon and assess subjects of various treatment/demographics combinations.
+can be used to assess the prognostic accuracy of PSA in predicting PCa progression at various clinical horizons $t$ and subject treatments/demographics $X$. It is also useful for computing sensitivity, specificity, and other related measures of prognostic accuracy. We focus on the one-year $(t=365)$ horizon and assess subjects of various treatment/demographics combinations. We do not consider global assessments of prognostic accuracy and rather opt for conditional measures, as the data do not provide sample weights or other means for deriving a population-level estimate.
 
 The posterior distribution of $\rho=\sigma_{YZ}/(\sigma_Y\sigma_Z)$ quantifies the strength of the co-pathway relationship between PSA and PCa progression. We also examine this posterior as a heuristic to support the contingency table analysis.
 
@@ -89,7 +93,7 @@ To jointly model the latent time-to-event outcome covariance matrix $\Sigma_{YZ}
 
 The specific choices of default hyperparameters were chosen by a short simulation study conducted prior to the analysis of real data.
 
-# 4. Posterior Computation and Diagnostics
+# 4. Posterior Computation and Model Diagnostics
 
 The full conditional posterior is defined up to a normalizing constant below.
 
@@ -112,13 +116,171 @@ It should be noted that to improve posterior stability in the right-censored cas
 
 Through repeated experimentation, we settle on computing 4 chains each with 2500 posterior draws following a thinning rate of 4 and 1000 burn-in draws to balance computation time, convergence testing capability, effective sample size, and memory usage.
 
-To preserve document space, we sample from the posterior and present trace and ACF plots for the regression coefficients and (co)variance term posterior samples in the appendix file under Section 4. A majority of the parameter samples experience good convergence and acceptable as seen in the trace plots, and ACF tapers off to 0 between lag 10 and 20. This does indicate relatively strong sample-to-sample autocorrelation, but this is unsurprising due to the complicated hierarchical structure of our priors and high-dimensionality of the parameter space. The convergence as evaluated by Gelman-Rubin diagnostic is very good, and MCSE is consistently quite low relative to the scale of the parameter posterior centers.
+To preserve document space, we sample from the posterior and present trace and ACF plots for the regression coefficients and (co)variance term posterior samples in the appendix file under Section 4. The posterior samples are imported here post-hoc.
+
+```{r}
+source("back_end.R")
+nna_idx = which(!is.na(progression$RNNEWLES_lb))
+boundsyz = array(
+  c(
+    progression$PSPCRIT_lb[nna_idx], progression$RNNEWLES_lb[nna_idx],
+    progression$PSPCRIT_rb[nna_idx], progression$RNNEWLES_rb[nna_idx]
+  ),
+  dim=c(length(nna_idx), 2, 2)
+) %>%
+  do(\(arr){
+    arr[,,1] = pmin(arr[,,1], 1000)
+    arr[,,2] = pmin(arr[,,2], 2000)
+    arr
+  })
+x = model.matrix(
+  ~.,
+  data=progression[nna_idx,colnames(progression)%in%colnames(progression)[10:18]]
+)
+# compute many posterior chains
+set.seed(123)
+# lognorm_posterior_chains = lapply(1:4, \(i){
+#   lognorm_model(
+#     boundsyz=boundsyz,
+#     x=x,
+#     m0=0,
+#     v0=1e+3,
+#     a0=2,
+#     b0=1,
+#     d0=2,
+#     W0=(1+diag(2))/4,
+#     M=2500,
+#     burnin=1e+4,
+#     thin=4
+#   )
+# })
+# saveRDS(lognorm_posterior_chains, "LogNormPostChains.RDS")
+lognorm_posterior_chains = readRDS("LogNormPostChains.RDS")
+```
+
+A majority of the parameter samples experience good convergence and acceptable as seen in the trace plots, and ACF tapers off to 0 between lag 10 and 20. This does indicate relatively strong sample-to-sample autocorrelation, but this is unsurprising due to the complicated hierarchical structure of our priors and high-dimensionality of the parameter space. The convergence as evaluated by Gelman-Rubin diagnostic is very good, and MCSE is consistently quite low relative to the scale of the parameter posterior centers.
 
 # 5. Posterior Results and Interpretation
 
 ## Posterior Examinations
 
-Again for the purposes of preserving document space, we display the posterior density plots in the appendix and only comment on the most important findings here.
+Again for the purposes of preserving document space, we display the posterior density plots in the appendix and only comment on the most important findings here. Section 5 of the appendix contains posterior density figures for the regression parameters and between-outcome partial correlation given covariates. Posterior summary tables are also provided below.
+
+```{r}
+cat("Regression parameter vector posterior means (sd):\n")
+arrapply(1:14, 1:2, f=\(idx1, idx2){
+  lognorm_posterior_chains %>%
+    lapply(\(p)p$betayz[idx1,idx2,]) %>%
+    do.call(c, .) %>%
+    do(\(x)paste0(round(mean(x), 4), " (", round(sd(x), 4), ")"))
+}) %>%
+  setDimnames(1:14, paste0("beta", c("y", "z"))) %>%
+  do(\(mat)cbind(colnames(x), mat)) %>%
+  noquote()
+
+cat("\nRegression parameter vector posterior 95% credible intervals:\n")
+arrapply(1:14, 1:2, f=\(idx1, idx2){
+  lognorm_posterior_chains %>%
+    lapply(\(p)p$betayz[idx1,idx2,]) %>%
+    do.call(c, .) %>%
+    do(\(x)unname(round(quantile(x, probs=c(0.025, 0.975)), 4))) %>%
+    do(\(x)paste0("(", x[1], ", ", x[2], ")"))
+}) %>%
+  setDimnames(1:14, paste0("beta", c("y", "z"))) %>%
+  do(\(mat)cbind(colnames(x), mat)) %>%
+  noquote()
+```
+
+Examining the credible intervals for the regression parameter vector shows a deceptively counter-intuitive result: Subjects that received chemotherapy were associated with earlier progression times. However, we strongly advise against interpreting this as a causal link, as the allocation of subjects to the various cancer treatment groups was done not at random. It is quite reasonable to suggest that subjects with worse health statuses were more probable to receive chemotherapy, and that the worse health status contributed to the shorter times-to-event. For this reason, we also concede that the aforementioned latent disease severity and underlying progression status may unfortunately manifest in the covariates by this confounding, thus reducing the outcome-to-outcome partial correlation given the covariate vector. The partial correlation posterior is shown in the below density figure.
+
+```{r}
+lognorm_posterior_chains %>%
+  lapply(\(p)p$Sigmayz[1,2,]/sqrt(p$Sigmayz[1,1,]*p$Sigmayz[2,2,])) %>%
+  do.call(c, .) %>%
+  do(\(rho){
+    tibble(`Partial Correlation` = rho) %>%
+      ggplot() +
+      geom_density(aes(x=`Partial Correlation`), fill="lightblue", alpha=0.7) +
+      geom_label(
+        aes(x=x, y=y, label=label),
+        data=tibble(
+          x=-0.5,
+          y=5,
+          label=paste0("mean (sd) = ", round(mean(rho), 4), " (", round(sd(rho), 4), ")")
+        )
+      ) +
+      geom_label(
+        aes(x=x, y=y, label=label),
+        data=tibble(
+          x=-0.5,
+          y=4.5,
+          label=unname(round(quantile(rho, probs=c(0.025, 0.975)), 4)) %>%
+            do(\(x)paste0("95% credible interval: (", x[1], ", ", x[2], ")"))
+        )
+      ) +
+      ggtitle("Posterior distribution of Y,Z outcomes' partial correlation given X") +
+      ylab("Density") +
+      xlim(c(-1, 1)) +
+      theme_bw()
+  })
+```
+
+Examining this posterior, we can see that the posterior mean (0.0456) is quite near to 0, and the corresponding credible interval (-0.0946, 0.1844) contains 0. We do note that there is a posterior probability of 0.7367 that the partial correlation is positive, which provides slight evidence that there is a latent correlation structure between the outcomes.
+
+## Conditional Prognostic Accuracy Measures
+
+For various covariate profiles, we compute confusion matrices for disease progression at the 365 day clinical horizon as described in Section 2.
+
+```{r}
+do(f=\(){
+  post_betayz_combined = lognorm_posterior_chains %>%
+    lapply(\(p)p$betayz) %>%
+    do(\(l)do.call(abind::abind, append(l, c(along=3))))
+  post_Sigmayz_combined = lognorm_posterior_chains %>%
+    lapply(\(p)p$Sigmayz) %>%
+    do(\(l)do.call(abind::abind, append(l, c(along=3))))
+  covariate_profiles = list(
+    # Hispanic, aged 65-74, received chemo and anti-androgen therapy
+    tibble(
+      ETHGRP = "1", AGEGRP = "65-74 Years", CXCLASS_chemo = 1, CXCLASS_other_systemic = 0,
+      CXCLASS_immuno = 0, CXCLASS_hormonal = 0, BISPHOS = 0, ANTIANDR = 1
+    ),
+    # Japanese, aged >=75, received no therapies
+    tibble(
+      ETHGRP = "10", AGEGRP = ">=75 Years", CXCLASS_chemo = 0, CXCLASS_other_systemic = 0,
+      CXCLASS_immuno = 0, CXCLASS_hormonal = 0, BISPHOS = 0, ANTIANDR = 0
+    ),
+    # Other race, aged 18-64, received immunotherapy and bisphosphonate therapy
+    tibble(
+      ETHGRP = "99", AGEGRP = "18-64 Years", CXCLASS_chemo = 0, CXCLASS_other_systemic = 0,
+      CXCLASS_immuno = 1, CXCLASS_hormonal = 0, BISPHOS = 1, ANTIANDR = 0
+    )
+  ) %>%
+    do.call(rbind, .) %>%
+    mutate(ETHGRP = factor(ETHGRP, levels=c("1", "10", "8", "9", "98", "99"))) %>%
+    model.matrix(~., data=.)
+  print(
+    lognorm_sample_ppd(covariate_profiles, post_betayz_combined, post_Sigmayz_combined) %>%
+      confusion_matrix(t=365)
+  )
+  print(
+    lognorm_sample_ppd(covariate_profiles, post_betayz_combined, post_Sigmayz_combined) %>%
+      confusion_matrix(t=365) %>%
+      apply(3, \(conf_mat){
+        precision = conf_mat[2,2]/sum(conf_mat[2,])
+        recall = conf_mat[2,2]/sum(conf_mat[,2])
+        c(
+          precision = precision,
+          recall = recall,
+          F1Score = 2*(precision*recall)/(precision+recall)
+        )
+      }) %>%
+      t()
+  )
+})
+```
+
+As is most easily seen in the confusion matrix metrics of precision (predictive positive value, or PPV), recall (true positive rate), and F1-Score (the harmonic mean of precision and recall), the quality of prognosis by PSA blood test varies greatly by patient demographics and treatment information. This further motivates our decision to compute conditional prognostic accuracy measures as opposed to global metrics.
 
 # 6. Sensitivity Analysis and Model Checking
 
@@ -203,7 +365,7 @@ The parameter $\delta$ allows PCa progression to occur systematically later (or 
 
 The gamma distribution shares the two properties used to motivate the log-normal likelihood in Section 2: strictly positive support, and variance that increases with the location, here with a constant coefficient of variation $\alpha_A^{-1/2}$. Both models are accelerated failure time models, in which covariates act multiplicatively on the event time, so covariate effects are on the same time-ratio scale. The intercepts are not directly comparable, since $\mathbb{E}[\log Y\mid X]=X^\prime\beta+\sum_{A\in\{T,Y\}}\left(\psi(\alpha_A)-\log\alpha_A\right)$ under this model, where $\psi$ is the digamma function.
 
-The gamma and log-normal distributions differ in hazard shape and tails. The log-normal hazard is non-monotone: it rises to a peak and then declines, with a heavy right tail. The gamma hazard at each level of the model is monotone: increasing for $\alpha_A>1$, decreasing for $\alpha_A<1$, and constant (exponential) for $\alpha_A=1$. The log-gamma errors are also left-skewed on the log-time scale, which places relatively more mass on early event times than symmetric normal errors. Marginally over $T$, each observed event time is a product of two independent gamma variables rather than a gamma variable. Because the one-year progression status of subjects with incomplete follow-up is recovered from the model, a different shape over the first 365 days is precisely the kind of assumption that could alter the estimated confusion matrix. Agreement between the two models would indicate that the diagnostic accuracy conclusions are robust to both the choice of event-time distribution and the form of the dependence between outcomes.
+The gamma and log-normal distributions differ in hazard shape and tails. The log-normal hazard is non-monotone: it rises to a peak and then declines, with a heavy right tail. The gamma hazard at each level of the model is monotone: increasing for $\alpha_A>1$, decreasing for $\alpha_A<1$, and constant (exponential) for $\alpha_A=1$. The log-gamma errors are also left-skewed on the log-time scale, which places relatively more mass on early event times than symmetric normal errors. Marginally over $T$, each observed event time is a product of two independent gamma variables rather than a gamma variable. Because the one-year progression status of subjects with incomplete follow-up is recovered from the model, a different shape over the first 365 days is precisely the kind of assumption that could alter the estimated confusion matrix. Agreement between the two models would indicate that the prognostic accuracy conclusions are robust to both the choice of event-time distribution and the form of the dependence between outcomes.
 
 ### Conditional Data Likelihood
 
@@ -236,7 +398,7 @@ $$
   
 This prior has its mode at $\alpha_A=1$ (the exponential model), mean 2, and central 95% interval $(0.24,5.57)$. It covers decreasing, constant, and increasing hazards, and coefficients of variation between roughly 0.42 and 2.03, without favoring either hazard direction.
 
-### Posterior Computation and Diagnostics
+### Posterior Computation and Model Diagnostics
 
 The joint posterior, including the latent progression times $t$, is defined up to a normalizing constant by
 
@@ -274,7 +436,7 @@ AUTHOR'S NOTE: Relevant computations will be done here.
 | No PCa Progression | 0.31 | 0.34 |
 | PCa Progression | 0.09 | 0.27 |
 
-At $t = 365$, averaged over the $n = 412$ subjects, the alternative model gives sensitivity 0.75 (95% CrI 0.65, 0.84), specificity 0.48 (0.41, 0.56), PPV 0.44 (0.36, 0.52), and NPV 0.78 (0.69, 0.86), compared with [ ] and [ ] under the primary model. PSA progression within one year is predicted for 60% of subjects versus 35% for PCa progression, so PSA progression is sensitive but nonspecific: a negative result is more informative than a positive one. Subjects with prior class 0 therapy show higher sensitivity (0.85) and lower specificity (0.31) than those without (0.69, 0.50), but under the shared-$\beta$ structure this reflects their faster progression relative to the horizon, not a difference in PSA's diagnostic value.
+At $t = 365$, averaged over the $n = 412$ subjects, the alternative model gives sensitivity 0.75 (95% CrI 0.65, 0.84), specificity 0.48 (0.41, 0.56), PPV 0.44 (0.36, 0.52), and NPV 0.78 (0.69, 0.86), compared with [ ] and [ ] under the primary model. PSA progression within one year is predicted for 60% of subjects versus 35% for PCa progression, so PSA progression is sensitive but nonspecific: a negative result is more informative than a positive one. Subjects with prior class 0 therapy show higher sensitivity (0.85) and lower specificity (0.31) than those without (0.69, 0.50), but under the shared-$\beta$ structure this reflects their faster progression relative to the horizon, not a difference in PSA's prognostic value.
 
 Compared with a nonparametric (Turnbull) estimate, the model overpredicts one-year progression for both PSA (0.60 vs 0.55) and PCa (0.35 vs 0.27). This is likely a consequence of capping censored upper bounds at 2000 days, which forces all latent times below that value; as the primary model uses the same cap, the model comparison remains fair, but both models' accuracy estimates should be read with this in mind.
 \color{black}

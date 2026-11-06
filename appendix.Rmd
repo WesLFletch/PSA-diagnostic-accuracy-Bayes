@@ -35,24 +35,29 @@ boundsyz = array(
     arr[,,2] = pmin(arr[,,2], 2000)
     arr
   })
-x = model.matrix(reformulate(colnames(progression)[10:17]), data=progression[nna_idx,])
+x = model.matrix(
+  ~.,
+  data=progression[nna_idx,colnames(progression)%in%colnames(progression)[10:18]]
+)
 # compute many posterior chains
 set.seed(123)
-lognorm_posterior_chains = lapply(1:4, \(i){
-  lognorm_model(
-    boundsyz=boundsyz,
-    x=x,
-    m0=0,
-    v0=1e+3,
-    a0=2,
-    b0=1,
-    d0=2,
-    W0=(1+diag(2))/4,
-    M=2500,
-    burnin=1e+4,
-    thin=4
-  )
-})
+# lognorm_posterior_chains = lapply(1:4, \(i){
+#   lognorm_model(
+#     boundsyz=boundsyz,
+#     x=x,
+#     m0=0,
+#     v0=1e+3,
+#     a0=2,
+#     b0=1,
+#     d0=2,
+#     W0=(1+diag(2))/4,
+#     M=2500,
+#     burnin=1e+4,
+#     thin=4
+#   )
+# })
+# saveRDS(lognorm_posterior_chains, "LogNormPostChains.RDS")
+lognorm_posterior_chains = readRDS("LogNormPostChains.RDS")
 ```
 
 ## Lognormal model posterior diagnostics
@@ -63,15 +68,18 @@ posterior_diagnostics_lorgnorm = function(post_chains, param, idx1, idx2, lag_ma
     lapply(\(p)p[[param]][idx1,idx2,]) %>%
     do(\(l)do.call(posterior_diagnostics, append(l, c(lag_max = lag_max)))) %>%
     do(\(l){
-      l$trace_plot = l$trace_plot +
-        ggtitle(paste0(param, "[", idx1, ",", idx2, "] trace plot"))
-      l$acf_plot = l$acf_plot + ggtitle(paste0(param, "[", idx1, ",", idx2, "] ACF plot"))
+      l$plots = patchwork::wrap_plots(list(
+        l$trace_plot + ggtitle(paste0(param, "[", idx1, ",", idx2, "] trace plot")),
+        l$acf_plot + ggtitle(paste0(param, "[", idx1, ",", idx2, "] ACF plot"))
+      ), ncol=2)
+      l$trace_plot = NULL
+      l$acf_plot = NULL
       l
     })
 }
 for (idx in 1:14) {
   for (yz in 1:2) {
-    posterior_diagnostics_lorgnorm(lognorm_posterior_chains, "betayz", idx, yz)
+    print(posterior_diagnostics_lorgnorm(lognorm_posterior_chains, "betayz", idx, yz))
   }
 }
 posterior_diagnostics_lorgnorm(lognorm_posterior_chains, "Sigmayz", 1, 1)
@@ -101,4 +109,61 @@ plot_beta_densities_lorgnorm = function(post_chains, idx) {
     theme_bw()
 }
 for (idx in 1:14) print(plot_beta_densities_lorgnorm(lognorm_posterior_chains, idx))
+```
+
+```{r}
+cat("Regression parameter vector posterior means (sd):\n")
+arrapply(1:14, 1:2, f=\(idx1, idx2){
+  lognorm_posterior_chains %>%
+    lapply(\(p)p$betayz[idx1,idx2,]) %>%
+    do.call(c, .) %>%
+    do(\(x)paste0(round(mean(x), 4), " (", round(sd(x), 4), ")"))
+}) %>%
+  setDimnames(1:14, paste0("beta", c("y", "z"))) %>%
+  do(\(mat)cbind(colnames(x), mat)) %>%
+  noquote()
+
+cat("\nRegression parameter vector posterior 95% credible intervals:\n")
+arrapply(1:14, 1:2, f=\(idx1, idx2){
+  lognorm_posterior_chains %>%
+    lapply(\(p)p$betayz[idx1,idx2,]) %>%
+    do.call(c, .) %>%
+    do(\(x)unname(round(quantile(x, probs=c(0.025, 0.975)), 4))) %>%
+    do(\(x)paste0("(", x[1], ", ", x[2], ")"))
+}) %>%
+  setDimnames(1:14, paste0("beta", c("y", "z"))) %>%
+  do(\(mat)cbind(colnames(x), mat)) %>%
+  noquote()
+```
+
+```{r}
+lognorm_posterior_chains %>%
+  lapply(\(p)p$Sigmayz[1,2,]/sqrt(p$Sigmayz[1,1,]*p$Sigmayz[2,2,])) %>%
+  do.call(c, .) %>%
+  do(\(rho){
+    tibble(`Partial Correlation` = rho) %>%
+      ggplot() +
+      geom_density(aes(x=`Partial Correlation`), fill="lightblue", alpha=0.7) +
+      geom_label(
+        aes(x=x, y=y, label=label),
+        data=tibble(
+          x=-0.5,
+          y=5,
+          label=paste0("mean (sd) = ", round(mean(rho), 4), " (", round(sd(rho), 4), ")")
+        )
+      ) +
+      geom_label(
+        aes(x=x, y=y, label=label),
+        data=tibble(
+          x=-0.5,
+          y=4.5,
+          label=unname(round(quantile(rho, probs=c(0.025, 0.975)), 4)) %>%
+            do(\(x)paste0("95% credible interval: (", x[1], ", ", x[2], ")"))
+        )
+      ) +
+      ggtitle("Posterior distribution of Y,Z outcomes' partial correlation given X") +
+      ylab("Density") +
+      xlim(c(-1, 1)) +
+      theme_bw()
+  })
 ```
