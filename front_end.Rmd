@@ -448,6 +448,45 @@ AUTHOR'S NOTE: Relevant computations will be done here.
 The alternative model gives $\rho = 0.22$ (95% CrI 0.11, 0.36), compared with [ ] (95% CrI [ , ]) under the primary model. The low value reflects the near-exponential PSA-specific scatter ($\alpha_Y \approx 1.1$): PSA progression varies more around the latent progression time than with it. As $\rho$ is restricted to $(0,1)$ here, only its magnitude is informative. A weak dependence is consistent with the contingency table: PSA progression frequently occurs without subsequent PCa progression within the horizon.
 \color{black}
 
+For various covariate profiles, which were also utilized for the posterior examination of the lognormal model, we compute confusion matrices for disease progression at the 365 day clinical horizon as described in Section 2.
+```{r gamma-profiles, echo=FALSE}
+do(f=\(){
+  covariate_profiles = list(
+    # Hispanic, aged 65-74, received chemo and anti-androgen therapy
+    tibble(ETHGRP = "1", AGEGRP = "65-74 Years", CXCLASS_chemo = 1, CXCLASS_other_systemic = 0,
+           CXCLASS_immuno = 0, CXCLASS_hormonal = 0, BISPHOS = 0, ANTIANDR = 1),
+    # Japanese, aged >=75, received no therapies
+    tibble(ETHGRP = "10", AGEGRP = ">=75 Years", CXCLASS_chemo = 0, CXCLASS_other_systemic = 0,
+           CXCLASS_immuno = 0, CXCLASS_hormonal = 0, BISPHOS = 0, ANTIANDR = 0),
+    # Other race, aged 18-64, received immunotherapy and bisphosphonate therapy
+    tibble(ETHGRP = "99", AGEGRP = "18-64 Years", CXCLASS_chemo = 0, CXCLASS_other_systemic = 0,
+           CXCLASS_immuno = 1, CXCLASS_hormonal = 0, BISPHOS = 1, ANTIANDR = 0)
+  ) %>%
+    do.call(rbind, .) %>%
+    mutate(ETHGRP = factor(ETHGRP, levels=c("1", "10", "8", "9", "98", "99")),
+           AGEGRP = factor(AGEGRP, levels=c(">=75 Years", "18-64 Years", "65-74 Years"))) %>%
+    model.matrix(~., data=.)
+  # gamma model has no immunotherapy term; columns ordered as in its design matrix
+  gamma_profiles = covariate_profiles[, c(
+    "(Intercept)", "AGEGRP18-64 Years", "AGEGRP65-74 Years",
+    "ETHGRP10", "ETHGRP8", "ETHGRP9", "ETHGRP98", "ETHGRP99",
+    "CXCLASS_chemo", "CXCLASS_other_systemic", "CXCLASS_hormonal", "BISPHOS", "ANTIANDR")]
+  cm = gamma_sample_ppd(gamma_profiles, gamma_results$draws$beta,
+                        gamma_results$draws$delta, gamma_results$draws$alphas) %>%
+    confusion_matrix(t=365)
+  print(cm)
+  print(
+    cm %>%
+      apply(3, \(conf_mat){
+        precision = conf_mat[2,2]/sum(conf_mat[2,])
+        recall = conf_mat[2,2]/sum(conf_mat[,2])
+        c(precision = precision, recall = recall,
+          F1Score = 2*(precision*recall)/(precision+recall))
+      }) %>%
+      t()
+  )
+})
+```
 ## Bayesian Justification
 
 We are motivated towards a Bayesian approach due to three primary characteristics of our research objective.
