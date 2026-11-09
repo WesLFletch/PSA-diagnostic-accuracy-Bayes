@@ -198,6 +198,95 @@ lognorm_sample_ppd = function(x,            # n by p design matrix
 }
 
 # Gamma latent time model -----------------------------------------------------------
+# Data Bounds Adjustments for Gamma Model Fitting Issues:
+progression = do(f=\(){
+  subdir = "D4320C00015 De-Identified RDB Data"
+  vsit = haven::read_sas(paste(getwd(), subdir, "r_visit.sas7bdat",  sep="/"))
+  demo = haven::read_sas(paste(getwd(), subdir, "r_dem.sas7bdat",    sep="/"))
+  capx = haven::read_sas(paste(getwd(), subdir, "r_caprx.sas7bdat",  sep="/")) %>%
+    # remedy row duplication induced by multiple treatments per SUBJ
+    summarise(
+      .by=SUBJ,
+      CXCLASS_chemo           = as.numeric(any(CXCLASS =="0", na.rm = TRUE)),
+      CXCLASS_other_systemic  = as.numeric(any(CXCLASS =="2", na.rm = TRUE)),
+      CXCLASS_immuno          = as.numeric(any(CXCLASS =="3", na.rm = TRUE)),
+      CXCLASS_hormonal        = as.numeric(any(CXCLASS =="4", na.rm = TRUE)),
+      BISPHOS                 = as.numeric(any(BISPHOS =="1", na.rm = TRUE)),  # CHANGED: na.rm
+      ANTIANDR                = as.numeric(any(ANTIANDR=="1", na.rm = TRUE))   # CHANGED: na.rm
+    )
+  prog = haven::read_sas(paste(getwd(), subdir, "rd_psa.sas7bdat",   sep="/"))
+  rcst = haven::read_sas(paste(getwd(), subdir, "rd_rcist.sas7bdat", sep="/"))
+  # CHANGED: PSA bounds from the derived subject-level event time.
+  # PSPCRIT is the subject's PSA outcome repeated on every row (A = progressed,
+  # 0 = no, 5 = death), so it cannot be used as a visit-level flag.
+  # Deaths before progression are censored at the date of death.
+  psa_bounds = prog %>%
+    summarise(
+      .by = SUBJ,
+      event = first(PSPCRIT) == "A",
+      pday  = first(PSPDYRND),
+      PSPCRIT_lb = if (event) max(c(0, LABDYRND[LABDYRND < pday]), na.rm = TRUE) else pday,
+      PSPCRIT_rb = if (event) pday else Inf
+    ) %>%
+    select(SUBJ, PSPCRIT_lb, PSPCRIT_rb)
+  # compute lesion bounds from visit-level data
+  vsit %>% distinct(SUBJ, VISIT, VISDYTRT) %>% # start with patient/visits
+    drop_na() %>%
+    # CHANGED: only the lesion outcome is joined here (PSA handled above;
+    # secg/opia were never read in and are not used in the model)
+    left_join(
+      rcst %>% distinct(SUBJ, VISIT, RNNEWLES),
+      by=c("SUBJ" = "SUBJ", "VISIT" = "VISIT")
+    ) %>%
+    drop_na(RNNEWLES) %>% # drop visits that did not check for new lesions
+    arrange(SUBJ, VISIT) %>%
+    group_by(SUBJ) %>%
+    summarise( # compute the lesion interval bounds for all subjects
+      RNNEWLES_lb = max(VISDYTRT[VISDYTRT<min(VISDYTRT[RNNEWLES=="1"])], 0),
+      RNNEWLES_rb = max(min(VISDYTRT[RNNEWLES=="1"]), 1),
+      .groups="drop"
+    ) %>%
+    # CHANGED: join the corrected PSA bounds
+    inner_join(psa_bounds, by=c("SUBJ" = "SUBJ")) %>%
+    # join demographic variables
+    left_join(demo %>% distinct(SUBJ, ETHGRP, AGEGRP), by=c("SUBJ" = "SUBJ")) %>%
+    # join cancer therapy variables (already one row per subject)
+    left_join(capx, by=c("SUBJ" = "SUBJ")) %>%
+    # clean up demographic variables
+    mutate(ETHGRP = as.factor(ETHGRP), AGEGRP = as.factor(AGEGRP))
+})
+# note: subjects who never develop new lesions trigger "no non-missing arguments
+# to min; returning Inf" warnings above -- expected, this is what makes _rb = Inf
+
+# design matrix: same covariates as the primary log-normal model
+# (immunotherapy omitted: 4 subjects)
+x_formula = ~ AGEGRP + ETHGRP + CXCLASS_chemo + CXCLASS_other_systemic +
+  CXCLASS_hormonal + BISPHOS + ANTIANDR
+
+model_dat = progression %>%
+  ungroup() %>%
+  filter(!is.na(PSPCRIT_lb), !is.na(RNNEWLES_lb)) %>% # assessed for both outcomes
+  drop_na(all_of(all.vars(x_formula))) %>%
+  droplevels() # CHANGED: drop empty factor levels
+
+x = model.matrix(x_formula, data = model_dat) # n by p, includes intercept
+
+# interval bounds (y = PSA, z = PCa), capped as in Section 4 of the report:
+# upper = min(factual upper, 2000), lower = min(factual lower, 1000)
+boundsyz = array(
+  c(pmin(model_dat$PSPCRIT_lb, 1000), pmin(model_dat$RNNEWLES_lb, 1000),
+    pmin(model_dat$PSPCRIT_rb, 2000), pmin(model_dat$RNNEWLES_rb, 2000)),
+  dim = c(nrow(x), 2, 2),
+  dimnames = list(model_dat$SUBJ, c("y", "z"), c("lower", "upper"))
+)
+
+# CHANGED: checks before fitting -- stop if the data are wrong
+stopifnot(
+  nrow(model_dat) == n_distinct(model_dat$SUBJ),   # one row per subject
+  sum(model_dat$PSPCRIT_rb <= 30) == 0,            # no (0, 1] PSA intervals
+  all(boundsyz[,,"lower"] < boundsyz[,,"upper"])
+)
+c(subjects = nrow(model_dat), psa_events = sum(is.finite(model_dat$PSPCRIT_rb)))  # expect 412, 224
 
 # gamma common-latent-time data-to-posterior model pipeline
 gamma_model = function(boundsyz,      # n by 2 (y vs z) by 2 (lower vs upper bound) array
