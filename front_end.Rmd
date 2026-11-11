@@ -283,7 +283,7 @@ The default hyperparameters encourage a moderate-to-strong co-pathway dependence
 
 We choose hyperparameter values $a_0=1$, $b_0=3$, and $W_0=I_2/2$ to ease the aforementioned dependence assumptions and therefore let the data likelihood be a stronger driver of the resulting posterior.
 
-The downstream effects of our choice of priors is examined heuristically through comparison of the $rho$ and $\beta_Y,\beta_Z$ posteriors to those of the default hyperparameter model. Specifically, posterior summary tables are produced identically to those of the default hyperparameter model for direct comparison, along with a recreation of the posterior density figure for the partial correlation.
+The downstream effects of our choice of priors is examined heuristically through comparison of the $\rho$ and $\beta_Y,\beta_Z$ posteriors to those of the default hyperparameter model. Specifically, posterior summary tables are produced identically to those of the default hyperparameter model for direct comparison, along with a recreation of the posterior density figure for the partial correlation.
 
 ```{r lognorm sensitivity analysis, echo=FALSE}
 set.seed(123)
@@ -420,8 +420,6 @@ Because covariates enter only through $T$, the alternative model replaces the pr
 
 This is a stronger conditional distribution assumption on $Y,Z\mid X$, and it is the main way the alternative model departs from the primary one. It removes $p$ regression parameters and the hierarchical variance parameters. The cost is that a covariate acting on one outcome more than the other cannot be represented, which may be the case for certain treatments. If such effects were substantial, the shared $\beta$ would average them across the two outcomes. We assess this by comparing the alternative model's $\beta$ with the primary model's posteriors for $\beta_Y$ and $\beta_Z$.
 
-AUTHOR' NOTE: We need to provide comparison of $\beta$ with the primary model's $\beta_Y$ and $\beta_Z$.
-
 #### Offset between outcomes
 
 The parameter $\delta$ allows PCa progression to occur systematically later (or earlier) than PSA progression for a given latent progression time, with $e^{\delta}=\mathbb{E}[Z\mid T]/\mathbb{E}[Y\mid T]$. Without it, the model would force both outcomes to occur at the same time on average, which would be a questionable assumption. Only one offset is identifiable alongside the intercept in $\beta$, so $Y$ is centered on $T$ and the offset is placed on $Z$.
@@ -481,21 +479,38 @@ As with the primary model, we sample from the posterior using `rjags`, with the 
 
 The three shape parameters are separated only through how the two outcomes vary jointly around the latent progression time, so they may mix more slowly than $\beta$ and $\delta$. We therefore examine their diagnostics first, and lengthen the chains if they do not meet the convergence criterion.
 
-Standard posterior diagnostics are done symmetrically to those of the lognormal model.
+Standard posterior diagnostics are done symmetrically to those of the lognormal model, and are presented in the appendix under Section 7.
 
-\color{red}
-AUTHOR'S NOTE: Relevant computations will be done here. I advise excluding the plots from this document, and instead referring to an external document to prevent document bloating.
+```{r fit gamma model, echo=FALSE}
+# gamma_results = lapply(1:4, \(i)gamma_model(
+#   boundsyz=boundsyz,
+#   x=x,
+#   m0=0,
+#   v0=1e+3,
+#   s0=2,
+#   r0=1,
+#   M=2500,
+#   burnin=1e+4,
+#   thin=4,
+#   seed=i
+# ))
+# saveRDS(gamma_results, "GammaPostChains.RDS")
+gamma_results = readRDS("GammaPostChains.RDS")
+```
+
+WF NOTE: The below paragraph needs to be re-verified.
+
 All Gelman–Rubin statistics are below 1.1 (maximum 1.042, intercept), with near-identical per-chain posterior means and fully overlapping trace plots. Effective sample sizes range from 234 (intercept) to 2,240 ($\alpha_Y$); the intercept and class 4 therapy coefficient mix slowest, as 94% of subjects received class 4 therapy. Plots are provided in the supplementary document.
 
 The offset is $\delta = 0.41$ (95% CrI 0.26, 0.55), so PCa progression occurs about 1.5 times later than PSA progression for a given latent progression time. The shapes are $\alpha_T = 5.39$ (3.20, 9.58), $\alpha_Y = 1.12$ (0.92, 1.35), and $\alpha_Z = 3.04$ (2.19, 4.41).
-\color{black}
 
 ### Analysis Outcome Measures and Model Comparisons
 
 The outcome measures are unchanged from Section 2, derived primarily from the posterior predictive distribution-derived contingency table. Relevant metrics are provided below.
 
 \color{red}
-AUTHOR'S NOTE: Relevant computations will be done here.
+AUTHOR'S NOTE: The below text needs to be re-done (aggregation of per-sample confusion matrices is not sound).
+
 | | No PSA Progression | PSA Progression |
 |--:|--:|--:|
 | No PCa Progression | 0.31 | 0.34 |
@@ -509,7 +524,8 @@ Compared with a nonparametric (Turnbull) estimate, the model overpredicts one-ye
 Analogous to the analysis using the primary model, the posterior distribution of $\rho$ is also examined as a heuristic to support the contingency table analysis.
 
 \color{red}
-AUTHOR'S NOTE: Relevant computations will be done here.
+AUTHOR'S NOTE: The below text needs to be verified.
+
 The alternative model gives $\rho = 0.22$ (95% CrI 0.11, 0.36), compared with [ ] (95% CrI [ , ]) under the primary model. The low value reflects the near-exponential PSA-specific scatter ($\alpha_Y \approx 1.1$): PSA progression varies more around the latent progression time than with it. As $\rho$ is restricted to $(0,1)$ here, only its magnitude is informative. A weak dependence is consistent with the contingency table: PSA progression frequently occurs without subsequent PCa progression within the horizon.
 \color{black}
 
@@ -517,28 +533,30 @@ For various covariate profiles, which were also utilized for the posterior exami
 
 ```{r gamma-profiles, echo=FALSE}
 do(f=\(){
+  beta_draws = lapply(gamma_results, \(l)l$beta) %>% abind::abind(along=2)
+  delta_draws = lapply(gamma_results, \(l)l$delta) %>% do.call(c, .)
+  alpha_draws = lapply(gamma_results, \(l)l$alphas) %>% abind::abind(along=2)
   covariate_profiles = list(
     # Hispanic, aged 65-74, received chemo and anti-androgen therapy
-    tibble(ETHGRP = "1", AGEGRP = "65-74 Years", CXCLASS_chemo = 1, CXCLASS_other_systemic = 0,
-           CXCLASS_immuno = 0, CXCLASS_hormonal = 0, BISPHOS = 0, ANTIANDR = 1),
+    tibble(
+      ETHGRP = "1", AGEGRP = "65-74 Years", CXCLASS_chemo = 1, CXCLASS_other_systemic = 0,
+      CXCLASS_immuno = 0, CXCLASS_hormonal = 0, BISPHOS = 0, ANTIANDR = 1
+    ),
     # Japanese, aged >=75, received no therapies
-    tibble(ETHGRP = "10", AGEGRP = ">=75 Years", CXCLASS_chemo = 0, CXCLASS_other_systemic = 0,
-           CXCLASS_immuno = 0, CXCLASS_hormonal = 0, BISPHOS = 0, ANTIANDR = 0),
+    tibble(
+      ETHGRP = "10", AGEGRP = ">=75 Years", CXCLASS_chemo = 0, CXCLASS_other_systemic = 0,
+      CXCLASS_immuno = 0, CXCLASS_hormonal = 0, BISPHOS = 0, ANTIANDR = 0
+    ),
     # Other race, aged 18-64, received immunotherapy and bisphosphonate therapy
-    tibble(ETHGRP = "99", AGEGRP = "18-64 Years", CXCLASS_chemo = 0, CXCLASS_other_systemic = 0,
-           CXCLASS_immuno = 1, CXCLASS_hormonal = 0, BISPHOS = 1, ANTIANDR = 0)
+    tibble(
+      ETHGRP = "99", AGEGRP = "18-64 Years", CXCLASS_chemo = 0, CXCLASS_other_systemic = 0,
+      CXCLASS_immuno = 1, CXCLASS_hormonal = 0, BISPHOS = 1, ANTIANDR = 0
+    )
   ) %>%
     do.call(rbind, .) %>%
-    mutate(ETHGRP = factor(ETHGRP, levels=c("1", "10", "8", "9", "98", "99")),
-           AGEGRP = factor(AGEGRP, levels=c(">=75 Years", "18-64 Years", "65-74 Years"))) %>%
+    mutate(ETHGRP = factor(ETHGRP, levels=c("1", "10", "8", "9", "98", "99"))) %>%
     model.matrix(~., data=.)
-  # gamma model has no immunotherapy term; columns ordered as in its design matrix
-  gamma_profiles = covariate_profiles[, c(
-    "(Intercept)", "AGEGRP18-64 Years", "AGEGRP65-74 Years",
-    "ETHGRP10", "ETHGRP8", "ETHGRP9", "ETHGRP98", "ETHGRP99",
-    "CXCLASS_chemo", "CXCLASS_other_systemic", "CXCLASS_hormonal", "BISPHOS", "ANTIANDR")]
-  cm = gamma_sample_ppd(gamma_profiles, gamma_results$draws$beta,
-                        gamma_results$draws$delta, gamma_results$draws$alphas) %>%
+  cm = gamma_sample_ppd(covariate_profiles, beta_draws, delta_draws, alpha_draws) %>%
     confusion_matrix(t=365)
   print(cm)
   print(
