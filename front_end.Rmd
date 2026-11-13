@@ -16,6 +16,10 @@ knitr::opts_chunk$set(echo = TRUE)
 Screening for prostate cancer (PCa) is commonly done by taking measures of patients' Prostate-Specific Antigen (PSA) levels, a relatively low-cost and non-invasive procedure. Although it is widely used for initial diagnoses, it may also be useful in determining further disease progression longitudinally following diagnosis in lieu of more costly and invasive methods. However, the reliability of PSA for this purpose is not guarantee. In a post hoc analysis of two phase III enzalutamide trials (N = 2,551), ARCHES in metastatic hormone-sensitive PCa and PROSPER in non-metastatic castration-resistant PCa, up to roughly a quarter of patients with radiographic progression showed no accompanying rise in PSA (Armstrong et al., 2026). These patients often had no new symptoms and had worse outcomes. The authors attribute the discordance to PSA production becoming uncoupled from tumor growth under androgen receptor inhibition. They recommend periodic imaging in addition to PSA monitoring. 
 As with PSA blood testing, the same limitation has been documented for blood-based tumor markers in ovarian and colorectal cancer. In platinum-sensitive recurrent ovarian cancer, Zebic et al. (2024) compared CA-125 progression with radiographic progression in 769 patients from the CALYPSO trial. CA-125 progression had a positive predictive value of 71% but a negative predictive value of only 33%. Approximately two in three women with radiographic progression did not meet the CA-125 progression criteria, and most of them had falling CA-125 levels. In colorectal cancer follow-up, a Cochrane review of 52 studies found that carcinoembryonic antigen (CEA) testing at the commonly recommended 5 µg/l threshold had a pooled sensitivity of 71% and specificity of 88% for detecting recurrence (Nicholson et al., 2015). The authors concluded that CEA is insufficiently sensitive to be used alone and recommended combining it with another diagnostic method. In both settings, the blood-based marker misses a substantial share of true progressions, so the marker alone cannot be relied on to rule progression out. This motivates our direct, quantitative assessment of how accurately PSA progression indicates true PCa progression.
 
+```{r import back end, echo=FALSE}
+source("back_end.R")
+```
+
 ## Objective and Data Overview
 
 We seek to evaluate the prognostic accuracy of the PSA blood test in determining PCa progression post-diagnosis through sensitivity and specificity analyses conducted on a longitudinal clinical trial sponsored by AstraZeneca (trial NCT00626548). The trial examined the efficacy of ZD4054 (Zibotentan) in treating non-metastatic hormone resistant PCa. The protected-access de-identified data contains information on subject follow-ups throughout the longitudinal study, including longitudinal PSA blood test results and screenings for additional lesions since diagnosis (our proxy for true PCa progression), as well as subject demographic and treatment information. Our measures of interest relate to the joint distribution of event times of first progression as detectable by PSA blood test and screening for new lesions.
@@ -24,9 +28,36 @@ We seek to evaluate the prognostic accuracy of the PSA blood test in determining
 
 For baseline covariates, we consider subject age group (`AGEGRP`); ethnic group (`ETHGRP`) with levels "Hispanic or Latino" (1), "Asian" (8), "Chinese" (9), "Japanese" (10), "NA" (98), and "Other" (99); cancer therapies used before the study (`CXCLASS`), Bisphosphonate therapy indicator (`BISPHOS`), and Anti-androgen therapy indicator (`ANTIANDR`). It should be noted that none of these features are "treatments" in the context of this clinical trial data, and that only the study's control arm is present due to trial discontinuation. As such, all of these features are considered to be our covariates.
 
+A brief examination of the covariates is provided in the below marginal and pairwise plot matrix.
+
+```{r}
+progression %>%
+  mutate(BISPHOS = factor(BISPHOS), ANTIANDR = factor(ANTIANDR)) %>%
+  GGally::ggpairs(columns=c(6, 7, 12, 13), progress=F) %>%
+  `+`(theme_bw())
+```
+
 ## Interval-Censored Longitudinal Data
 
 If a progression event occurs, then it is only known to have occurred between the times of the previous and subsequent visits. Further, if it does not occur before the subject's last follow-up date, then it is known only to have occurred after said date. So our knowledge of each subject's event times is restricted to the (in)finite time intervals in which the true event times exist, i.e. our data is interval-censored.
+
+A visual of the time-to-event distributions per outcome is shown below. The height of each curve at time $t$ corresponds to the proportion of samples whose outcome interval contains the respective value of $t$, i.e. the proportion of samples whose true event times could be $t$. Different curves are provided per outcome.
+
+```{r visualize outcomes distributions, echo=FALSE}
+arrapply(1:1000, 1:2, f=\(t, yz){
+  mean(boundsyz[,yz,1]<=t&t<=boundsyz[,yz,2])
+}) %>%
+  setDimnames(as.character(1:1000), c("Y", "Z")) %>%
+  as.data.frame.table() %>%
+  as_tibble() %>%
+  setColnames(c("t", "Outcome", "value")) %>%
+  mutate(t = as.numeric(as.character(t))) %>%
+  ggplot() +
+  geom_line(aes(x=t, y=value, color=Outcome)) +
+  ylim(c(0, 1)) +
+  ylab("Proportion of included outcome intervals") +
+  theme_bw()
+```
 
 # 2. Bayesian Model: Latent Hierarchical Joint Log-Normal Regression
 
@@ -120,7 +151,6 @@ Through repeated experimentation, we settle on computing 4 chains each with 2500
 To preserve document space, we sample from the posterior and present trace and ACF plots for the regression coefficients and (co)variance term posterior samples in the appendix file under Section 4. The posterior samples are imported here post-hoc.
 
 ```{r fit lognorm model, echo=FALSE}
-source("back_end.R")
 set.seed(123)
 # lognorm_posterior_chains = lapply(1:4, \(i){
 #   lognorm_model(
